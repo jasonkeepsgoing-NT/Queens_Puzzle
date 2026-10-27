@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>Queens — LinkedIn Puzzle Simulator</title>
+<title>Queens Puzzle — Logic Simulator &amp; Trainer</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" media="all" onerror="this.media='all';">
@@ -91,7 +91,7 @@ body::before{content:'';position:fixed;inset:0;
   background:radial-gradient(ellipse 60% 40% at 20% 10%,var(--bg-grad1) 0%,transparent 60%),
              radial-gradient(ellipse 40% 60% at 80% 80%,var(--bg-grad2) 0%,transparent 60%);
   pointer-events:none;z-index:0;}
-.container{position:relative;z-index:1;width:100%;max-width:100%;overflow-x:hidden;}
+.container{position:relative;z-index:1;width:100%;max-width:1480px;margin:0 auto;overflow-x:hidden;}
 header{text-align:center;margin-bottom:10px;}
 .logo-crown{font-size:30px;line-height:1;margin-bottom:5px;
   filter:drop-shadow(0 0 12px #f0c04060);animation:crown-pulse 3s ease-in-out infinite;}
@@ -128,17 +128,34 @@ select:hover,select:focus{border-color:var(--accent);outline:none;}
 .panels-top{grid-column:2;grid-row:1;display:flex;flex-direction:column;gap:10px;min-width:0;}
 .panels-bot{grid-column:2;grid-row:2;display:flex;flex-direction:column;gap:10px;min-width:0;}
 .board-col{grid-column:1;grid-row:1/3;min-width:0;}
+/* Wide screens: three columns — controls/challenge | board | info panels.
+   The board column takes all remaining width so no dead space is left. */
+@media(min-width:1180px){
+  .main-layout{grid-template-columns:300px minmax(0,1fr) 300px;grid-template-rows:auto;}
+  .panels-top{grid-column:1;grid-row:1;}
+  .board-col{grid-column:2;grid-row:1;}
+  .panels-bot{grid-column:3;grid-row:1;}
+}
 @media(max-width:720px){
   .main-layout{grid-template-columns:1fr;grid-template-rows:none;gap:9px;}
   .panels-top{grid-column:1;grid-row:1;order:1;}
   .board-col{grid-column:1;grid-row:auto;order:2;}
   .panels-bot{grid-column:1;grid-row:auto;order:3;}
+  /* Phones: board right after controls/stats; challenge panel just below it */
+  .panels-top{display:contents;}
+  .panels-top .controls{order:1;}
+  .panels-top .stats-strip{order:1;}
+  .panels-top .ch-panel{order:3;}
+  .board-col{order:2;}
+  .panels-bot{order:4;}
 }
 .board-col{min-width:0;}
 .board-panel{background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:16px;width:100%;position:relative;overflow:hidden;}
 .board-meta{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;flex-wrap:wrap;}
 .board-title{font-family:'Playfair Display',serif;font-size:15px;font-weight:700;}
-.board-meta-right{display:flex;align-items:center;gap:6px;}
+.board-meta-right{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;}
+/* Narrow side column: let control buttons fill each row instead of leaving gaps */
+@media(min-width:721px){.panels-top .controls>button{flex:1 1 auto;}}
 .btn-hint-inline{background:none;border:1px solid var(--border);color:var(--hint-c);
   font-size:10px;padding:4px 9px;border-radius:18px;cursor:pointer;font-family:'DM Mono',monospace;
   letter-spacing:1px;transition:all .18s;white-space:nowrap;}
@@ -194,13 +211,21 @@ select:hover,select:focus{border-color:var(--accent);outline:none;}
 #hint-detail.show{display:block;animation:fade-in .25s ease;}
 @keyframes fade-in{from{opacity:0;transform:translateY(4px)}to{opacity:1}}
 .board-wrapper{display:inline-grid;grid-template-columns:18px 1fr;grid-template-rows:18px 1fr;
-  gap:3px;max-width:min(540px,calc(100vw - 48px));width:100%;user-select:none;touch-action:none;}
+  gap:3px;max-width:min(var(--board-max),calc(100vw - 48px));width:100%;user-select:none;touch-action:none;}
+:root{--board-max:min(800px,max(420px,calc(100vh - 230px)));}
+/* Centers the board inside its panel when the column is wider than the board */
+.board-stage{display:flex;justify-content:center;width:100%;}
 .col-labels,.row-labels{display:grid;}
 .col-label,.row-label{display:flex;align-items:center;justify-content:center;
   font-family:'DM Mono',monospace;font-size:9px;font-weight:600;color:var(--text2);transition:color .15s;}
 .col-label.hi-err,.row-label.hi-err{color:var(--err);}
 #board-grid{display:grid;background:#000;border:3px solid #000;border-radius:7px;
-  overflow:hidden;width:100%;gap:0;touch-action:none;-webkit-user-select:none;user-select:none;}
+  overflow:hidden;width:100%;gap:0;touch-action:none;-webkit-user-select:none;user-select:none;
+  container-type:inline-size;}
+@supports (width:1cqw){
+  #board-grid .cell{font-size:clamp(11px,calc(100cqw / var(--n,8) * .42),30px);}
+  #board-grid .cell.state-queen::after{font-size:clamp(11px,calc(100cqw / var(--n,8) * .5),40px);}
+}
 .cell{width:100%;aspect-ratio:1;display:flex;align-items:center;justify-content:center;
   cursor:pointer;-webkit-user-drag:none;transition:filter .1s;}
 .cell:hover{filter:brightness(1.25) saturate(1.1);}
@@ -373,6 +398,7 @@ select:hover,select:focus{border-color:var(--accent);outline:none;}
   letter-spacing:-0.5px;text-shadow:0 0 20px #40c08060;margin-top:4px;}
 .win-card p{color:var(--text2);font-size:10.5px;font-family:'DM Mono',monospace;line-height:1.55;}
 .win-btns{display:flex;gap:7px;flex-wrap:wrap;justify-content:center;width:100%;}
+.win-card{max-height:calc(100% - 12px);overflow-y:auto;}
 .win-btns button{flex:1;min-width:74px;font-size:12px;padding:7px 10px;}
 
 .diff-badge{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:2px;text-transform:uppercase;
@@ -461,6 +487,111 @@ select:hover,select:focus{border-color:var(--accent);outline:none;}
 .legend{display:flex;flex-wrap:wrap;gap:5px;}
 .legend-item{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text2);font-family:'DM Mono',monospace;}
 .legend-dot{width:9px;height:9px;border-radius:2px;flex-shrink:0;}
+.about-note{margin-top:9px;padding-top:8px;border-top:1px solid var(--border);font-size:10px;line-height:1.55;
+  color:var(--text2);font-family:'DM Mono',monospace;}
+.about-ver{margin-top:4px;padding-top:0;border-top:none;opacity:.7;font-size:9px;}
+
+/* ══════════ CHALLENGE MODE ══════════ */
+.ch-panel h3{gap:7px;}
+.ch-streak{font-family:'DM Mono',monospace;font-size:10px;font-weight:500;color:#f07020;white-space:nowrap;}
+.ch-streak:empty{display:none;}
+.ch-tracks{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-bottom:9px;}
+.ch-track{display:flex;flex-direction:column;align-items:center;gap:1px;padding:5px 4px;border-radius:8px;
+  font-size:10.5px;font-weight:600;line-height:1.2;background:var(--surface2);border:1px solid var(--border);color:var(--text2);}
+.ch-track small{font-family:'DM Mono',monospace;font-size:8.5px;font-weight:400;opacity:.8;}
+.ch-track:hover{border-color:var(--accent);}
+.ch-track.sel{border-color:var(--tc,var(--accent));color:var(--tc,var(--accent));
+  background:color-mix(in srgb,var(--tc,var(--accent)) 12%,var(--surface));box-shadow:inset 0 0 0 1px var(--tc,var(--accent));}
+.ch-track.done small{color:var(--win);opacity:1;}
+.ch-rank-row{display:flex;justify-content:space-between;align-items:baseline;gap:6px;margin-bottom:4px;}
+.ch-rank{font-family:'Playfair Display',serif;font-weight:700;font-size:13px;}
+.ch-stars-total{font-family:'DM Mono',monospace;font-size:10px;color:#e0a000;white-space:nowrap;}
+.ch-prog{height:7px;border-radius:9px;background:var(--surface2);border:1px solid var(--border);overflow:hidden;}
+.ch-prog-bar{height:100%;width:0;border-radius:9px;background:linear-gradient(90deg,var(--accent),#e0a000);
+  transition:width .9s cubic-bezier(.2,.8,.2,1);}
+.ch-prog-txt{font-family:'DM Mono',monospace;font-size:9.5px;color:var(--text2);margin:4px 0 9px;line-height:1.45;}
+.ch-actions{display:flex;gap:6px;}
+.ch-go{flex:1;font-size:13px;}
+.ch-map-btn{color:var(--text2);border-color:var(--border);border-radius:7px;font-size:11px;padding:8px 10px;}
+.ch-map{display:grid;grid-template-columns:repeat(10,1fr);gap:3px;margin-top:9px;}
+.ch-lv{position:relative;aspect-ratio:1;border-radius:5px;padding:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;font-family:'DM Mono',monospace;font-size:9px;line-height:1;
+  background:var(--surface2);border:1px solid var(--border);color:var(--text);min-width:0;}
+.ch-lv .lv-st{font-size:6px;letter-spacing:-.5px;color:#e0a000;margin-top:1px;height:6px;}
+.ch-lv.boss{border-color:#e0a000;background:color-mix(in srgb,#e0a000 12%,var(--surface2));}
+.ch-lv.boss::before{content:'👑';position:absolute;top:-6px;right:-3px;font-size:8px;}
+.ch-lv.cleared{background:color-mix(in srgb,var(--win) 16%,var(--surface2));border-color:color-mix(in srgb,var(--win) 45%,transparent);}
+.ch-lv.next{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);animation:lv-pulse 1.6s ease-in-out infinite;}
+.ch-lv.locked{opacity:.38;cursor:not-allowed;}
+.ch-lv.cur{outline:2px solid var(--text);outline-offset:1px;}
+@keyframes lv-pulse{0%,100%{box-shadow:0 0 0 1px var(--accent);}50%{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 45%,transparent);}}
+.ch-hud{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;margin:-2px 0 8px;font-family:'DM Mono',monospace;
+  font-size:10.5px;color:var(--text2);}
+.ch-hud b{color:var(--text);font-weight:600;}
+.ch-hud .hud-boss{color:#e0a000;font-weight:700;letter-spacing:1px;animation:boss-glow 1.8s ease-in-out infinite;}
+@keyframes boss-glow{0%,100%{text-shadow:0 0 0 transparent;}50%{text-shadow:0 0 10px rgba(224,160,0,.75);}}
+.ch-hud .hud-nav{margin-left:auto;display:flex;gap:4px;}
+.ch-hud .hud-nav button{font-size:10px;padding:3px 8px;border-radius:14px;font-family:'DM Mono',monospace;}
+.ch-hud .hud-nav button:disabled{opacity:.35;cursor:not-allowed;}
+/* Win card — challenge variant */
+.win-card.ch-win{max-width:min(340px,92%);}
+.win-card.boss-win{border-color:#e0a00088;box-shadow:0 8px 40px rgba(0,0,0,.7),0 0 34px rgba(224,160,0,.45);}
+.win-card.boss-win h3{color:#e0a000;text-shadow:0 0 22px rgba(224,160,0,.6);}
+.win-ch{display:flex;flex-direction:column;align-items:center;gap:6px;width:100%;}
+.win-ch-level{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2.5px;text-transform:uppercase;color:var(--text2);}
+.win-stars{display:flex;gap:6px;font-size:34px;line-height:1;}
+.win-stars span{color:var(--border);transform:scale(.4);opacity:.4;transition:none;}
+.win-stars span.on{color:#f0b000;text-shadow:0 0 14px rgba(240,176,0,.7);animation:star-pop .5s cubic-bezier(.2,1.6,.4,1) forwards;}
+.win-stars span.off{animation:star-off .4s ease forwards;}
+@keyframes star-pop{0%{transform:scale(.2) rotate(-40deg);opacity:0;}100%{transform:scale(1) rotate(0);opacity:1;}}
+@keyframes star-off{to{transform:scale(1);opacity:.55;}}
+.win-ch-info{font-family:'DM Mono',monospace;font-size:10.5px;color:var(--text2);line-height:1.6;text-align:center;}
+.win-ch-info b{color:var(--text);}
+.win-ch-info .nb{color:var(--win);font-weight:700;}
+.win-extra{display:flex;flex-direction:column;gap:5px;width:100%;}
+.win-extra:empty{display:none;}
+.win-pill{font-family:'DM Mono',monospace;font-size:10px;line-height:1.4;padding:5px 9px;border-radius:8px;
+  border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);background:color-mix(in srgb,var(--accent) 10%,var(--surface));
+  color:var(--text);text-align:left;animation:fade-in .4s ease both;}
+.win-pill.rank{border-color:#e0a00088;background:color-mix(in srgb,#e0a000 12%,var(--surface));}
+/* Toasts */
+.toast-wrap{position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:400;display:flex;flex-direction:column;
+  gap:7px;align-items:center;pointer-events:none;width:min(360px,calc(100vw - 32px));}
+.toast{pointer-events:auto;width:100%;display:flex;gap:10px;align-items:center;padding:9px 13px;border-radius:11px;
+  background:var(--surface);border:1px solid #e0a00088;box-shadow:0 8px 28px rgba(0,0,0,.35);color:var(--text);
+  animation:toast-in .45s cubic-bezier(.2,1.3,.4,1) both;}
+.toast.out{animation:toast-out .35s ease forwards;}
+.toast .t-ic{font-size:24px;line-height:1;}
+.toast .t-tx{display:flex;flex-direction:column;gap:1px;min-width:0;}
+.toast .t-k{font-family:'DM Mono',monospace;font-size:8.5px;letter-spacing:1.5px;text-transform:uppercase;color:#e0a000;}
+.toast .t-n{font-weight:700;font-size:13px;}
+.toast .t-d{font-size:10.5px;color:var(--text2);}
+@keyframes toast-in{from{transform:translateY(-24px) scale(.94);opacity:0;}to{transform:none;opacity:1;}}
+@keyframes toast-out{to{transform:translateY(-12px);opacity:0;}}
+.fx-canvas{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:300;display:none;}
+/* Generic modal */
+.modal-back{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:250;align-items:center;justify-content:center;padding:16px;}
+.modal-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 20px;
+  width:min(520px,100%);max-height:88vh;overflow-y:auto;display:flex;flex-direction:column;gap:12px;}
+.modal-head{display:flex;justify-content:space-between;align-items:center;font-family:'Playfair Display',serif;font-size:16px;font-weight:700;}
+.modal-head .win-overlay-close{position:static;}
+.ach-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
+.ach-stat{background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:7px 6px;text-align:center;}
+.ach-stat b{display:block;font-family:'Playfair Display',serif;font-size:17px;}
+.ach-stat span{font-family:'DM Mono',monospace;font-size:8.5px;letter-spacing:1px;text-transform:uppercase;color:var(--text2);}
+.ach-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:6px;}
+.ach-item{display:flex;gap:9px;align-items:center;padding:7px 9px;border-radius:9px;background:var(--surface2);border:1px solid var(--border);}
+.ach-item .a-ic{font-size:22px;line-height:1;width:26px;text-align:center;}
+.ach-item .a-n{font-size:12px;font-weight:700;}
+.ach-item .a-d{font-size:10px;color:var(--text2);line-height:1.35;}
+.ach-item.locked{opacity:.5;}
+.ach-item.locked .a-ic{filter:grayscale(1);}
+.ach-item.got{border-color:#e0a00077;background:color-mix(in srgb,#e0a000 9%,var(--surface2));}
+.ach-foot{display:flex;justify-content:flex-end;}
+.ach-reset{color:var(--err);border-color:color-mix(in srgb,var(--err) 50%,transparent);}
+@media (prefers-reduced-motion:reduce){
+  .win-stars span.on,.toast,.ch-lv.next,.ch-hud .hud-boss{animation:none;opacity:1;transform:none;}
+}
 </style>
 </head>
 <body>
@@ -472,6 +603,7 @@ select:hover,select:focus{border-color:var(--accent);outline:none;}
       <option value="zh">中文</option>
     </select>
     <select id="theme-select" title="Theme" style="font-size:12px;padding:6px 7px;border-radius:6px;background:var(--surface2);border:1px solid var(--border);color:var(--text);cursor:pointer;touch-action:manipulation;min-height:32px;">
+      <option value="random" id="theme-opt-random">🎲 Random</option>
       <optgroup label="Light" data-i18n-label="grpLight">
         <option value="light1" data-i18n="thDaylight">☀ Daylight</option>
         <option value="light2" data-i18n="thSeafoam">☀ Seafoam</option>
@@ -487,7 +619,7 @@ select:hover,select:focus{border-color:var(--accent);outline:none;}
   </div>
   <div class="logo-crown">♛</div>
   <h1><span>Queens</span> Puzzle</h1>
-  <p class="subtitle" data-i18n="subtitle">LinkedIn Game Simulator &amp; Trainer</p>
+  <p class="subtitle" data-i18n="subtitle">Logic Puzzle Simulator &amp; Trainer</p>
 </header>
 
 <div class="main-layout">
@@ -544,6 +676,24 @@ select:hover,select:focus{border-color:var(--accent);outline:none;}
   <div class="stat-divider"></div>
   <div class="stat-item"><div class="stat-label">Time</div><div class="stat-value" id="stat-time">0:00</div></div>
 </div>
+    <div class="panel ch-panel" id="ch-panel">
+      <h3><span id="ch-title">🏆 Challenge</span>
+        <span class="ch-streak" id="ch-streak"></span>
+        <button class="sol-toggle" id="ch-trophy-btn" title="Trophies">🏅 0</button>
+      </h3>
+      <div class="ch-tracks" id="ch-tracks"></div>
+      <div class="ch-rank-row">
+        <span class="ch-rank" id="ch-rank"></span>
+        <span class="ch-stars-total" id="ch-stars-total"></span>
+      </div>
+      <div class="ch-prog" title=""><div class="ch-prog-bar" id="ch-prog-bar"></div></div>
+      <div class="ch-prog-txt" id="ch-prog-txt"></div>
+      <div class="ch-actions">
+        <button class="btn-generate ch-go" id="ch-go">▶ Start</button>
+        <button class="btn-hint-inline ch-map-btn" id="ch-map-btn">🗺 Levels</button>
+      </div>
+      <div class="ch-map" id="ch-map" style="display:none"></div>
+    </div>
   </div>
 
   <!-- BOARD: wide=col1 spanning rows 1+2; narrow=row2 between panels -->
@@ -560,6 +710,7 @@ select:hover,select:focus{border-color:var(--accent);outline:none;}
         <button class="btn-validate" id="btn-validate" style="display:none">✓ Start Game</button>
       </div>
     </div>
+    <div class="ch-hud" id="ch-hud" style="display:none"></div>
     <!-- Edit mode palette + instructions (hidden until Create is clicked) -->
     <div id="edit-mode-ui" style="display:none">
       <div class="edit-hint">✏ <strong>Create Mode</strong> — paint regions by clicking or dragging cells. Need exactly <span id="edit-n-needed">8</span> colors, one per region.</div>
@@ -579,19 +730,32 @@ select:hover,select:focus{border-color:var(--accent);outline:none;}
       <div class="progress-wrap"><div class="progress-bar" id="progress-bar"></div></div>
       <button id="btn-retry" onclick="retryGen()">↺ Retry</button>
     </div>
+    <div class="board-stage">
     <div class="board-wrapper" id="board-wrapper" style="display:none">
       <div></div>
       <div class="col-labels" id="col-labels"></div>
       <div class="row-labels" id="row-labels"></div>
       <div id="board-grid"></div>
     </div>
+    </div>
     <div id="hint-detail-wrap"><div id="hint-detail"></div></div>
     <div class="win-overlay" id="win-banner">
       <div class="win-card">
         <button class="win-overlay-close" id="win-close" aria-label="Close">&times;</button>
-        <h3>&#9819; Solved! &#9819;</h3>
+        <h3 id="win-title">&#9819; Solved! &#9819;</h3>
+        <div class="win-ch" id="win-ch" style="display:none">
+          <div class="win-ch-level" id="win-ch-level"></div>
+          <div class="win-stars" id="win-stars"><span>★</span><span>★</span><span>★</span></div>
+          <div class="win-ch-info" id="win-ch-info"></div>
+        </div>
         <p id="win-msg"></p>
-        <div class="win-btns">
+        <div class="win-extra" id="win-extra"></div>
+        <div class="win-btns" id="win-btns-ch" style="display:none">
+          <button class="btn-generate" id="win-ch-next">Next Level ▶</button>
+          <button class="btn-hint-inline" id="win-ch-retry">↺ Retry</button>
+          <button class="btn-hint-inline" id="win-ch-map">🗺 Levels</button>
+        </div>
+        <div class="win-btns" id="win-btns-free">
           <button class="btn-generate" id="win-btn-generate">&#9889; New Game</button>
           <button class="btn-random" id="win-btn-random">&#127922; Random</button>
           <button class="btn-hint-inline" id="win-btn-solution" style="color:var(--win);border-color:var(--win);">&#9654; Apply Solution</button>
@@ -636,6 +800,8 @@ select:hover,select:focus{border-color:var(--accent);outline:none;}
         <li><span>6</span><span data-i18n="rule6">Right-click = place ♛ directly</span></li>
         <li><span>7</span><span data-i18n="rule7">Drag from empty = bulk ✕; drag from ✕ = erase</span></li>
       </ul>
+      <p class="about-note" data-i18n="aboutNote">This game was inspired by LinkedIn's daily puzzle games. Its rules are the same as LinkedIn's Queens.</p>
+      <p class="about-note about-ver" id="about-ver"></p>
     </div>
   </div>
 </div>
@@ -643,6 +809,18 @@ select:hover,select:focus{border-color:var(--accent);outline:none;}
 
 </div>
 
+
+<!-- Trophy / progress modal -->
+  <div id="ach-modal" class="modal-back" style="display:none">
+    <div class="modal-card ach-card">
+      <div class="modal-head"><span id="ach-title">🏅 Trophies</span><button class="win-overlay-close" id="ach-close" aria-label="Close">&times;</button></div>
+      <div class="ach-stats" id="ach-stats"></div>
+      <div class="ach-list" id="ach-list"></div>
+      <div class="ach-foot"><button class="btn-hint-inline ach-reset" id="ach-reset">Reset progress</button></div>
+    </div>
+  </div>
+  <div id="toast-wrap" class="toast-wrap" aria-live="polite"></div>
+  <canvas id="fx-canvas" class="fx-canvas" aria-hidden="true"></canvas>
 
 <!-- Seed modal (restored) -->
   <div id="seed-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:200;align-items:center;justify-content:center;">
@@ -780,6 +958,7 @@ const THEMES={
 const LIGHT_THEMES=['light1','light2','light3'];
 const DARK_THEMES=['dark1','dark2','dark3'];
 let currentTheme='light1';
+let themePref='random';   // 'random' or a specific theme id (saved)
 let RC=RC_LIGHT1;
 function setTheme(theme){
   if(!THEMES[theme])theme='light1';
@@ -799,7 +978,8 @@ function setTheme(theme){
   meta.content=bg;
   const grid=$('board-grid');if(grid)grid.setAttribute('data-hintfx',def.fx);
   const sw=$('theme-toggle');if(sw)sw.textContent=def.mode==='dark'?'☀':'🌙';
-  const ts=$('theme-select');if(ts&&ts.value!==theme)ts.value=theme;
+  const ts=$('theme-select');const tsWant=themePref==='random'?'random':theme;if(ts&&ts.value!==tsWant)ts.value=tsWant;
+  if(typeof updateRandomThemeLabel==='function')updateRandomThemeLabel();
   // Re-render board with new colors if a game is loaded
   if(regions.length&&$('board-wrapper').style.display!=='none'&&!editMode){
     renderBoard();
@@ -2322,6 +2502,8 @@ function runGenLoop(n,diff,maxSingles,attempt){
 }
 function initPuzzle(n,diff,maxSingles){
   if(maxSingles===undefined)maxSingles=parseInt($('single-select').value)||0;
+  chExit();
+  SAVE.prefs.size=n;if(diff!=='custom')SAVE.prefs.diff=diff;persist();
   genAborted=true;
   setTimeout(()=>{
     genAborted=false;genRetryCount=0;
@@ -2348,6 +2530,7 @@ function initPuzzle(n,diff,maxSingles){
 function onPuzzleReady(n,diff,result){
   N=n;regions=result.regions;solution=result.solution;
   cellState=new Array(N*N).fill(0);moves=0;solved=false;
+  curMeta={kind:'gen',diff};resetAssist();
   undoStack.length=0;wrongQueenPhase=0;wrongQueenCell=null;applyStepIdx=0;
   solutionSteps=buildSolutionSteps(N,regions,solution);
   // Does solving this puzzle require lookahead (Tier 7) given the logical
@@ -2374,7 +2557,7 @@ function onPuzzleReady(n,diff,result){
 // RENDER BOARD
 // ═══════════════════════════════════════════════════════════════════════
 function renderBoard(){
-  const grid=$('board-grid');grid.style.gridTemplateColumns=`repeat(${N},1fr)`;grid.innerHTML='';
+  const grid=$('board-grid');grid.style.gridTemplateColumns=`repeat(${N},1fr)`;grid.style.setProperty('--n',N);grid.innerHTML='';
   const colL=$('col-labels');colL.style.gridTemplateColumns=`repeat(${N},1fr)`;colL.innerHTML='';
   for(let c=0;c<N;c++){const d=document.createElement('div');d.className='col-label';d.id=`cl-${c}`;d.textContent=String.fromCharCode(65+c);colL.appendChild(d);}
   const rowL=$('row-labels');rowL.style.gridTemplateRows=`repeat(${N},1fr)`;rowL.innerHTML='';
@@ -3077,6 +3260,7 @@ function getWrongQueens(){
 
 function showHint(){
   if(solved)return;
+  noteAssist('hint');
   clearTimeout(hintClearTimer);
   clearHintFx();
 
@@ -3186,6 +3370,7 @@ function updateStats(alsoConflicts=true){
   $('stat-placed').textContent=placed;$('stat-placed').className='stat-value'+(placed>N?' bad':placed>0?' good':'');
   $('stat-needed').textContent=N;$('stat-moves').textContent=moves;
   if(alsoConflicts)updateConflictHighlights();
+  if(typeof scheduleResumeSave==='function')scheduleResumeSave();
 }
 function getConflicts(){
   const qpos=[];for(let r=0;r<N;r++)for(let c=0;c<N;c++)if(cellState[r*N+c]===2)qpos.push([r,c]);
@@ -3251,6 +3436,7 @@ function checkWin(){
   $('win-msg').textContent=curLang==='zh'
     ?`用 ${moves} 步 · ${timeStr} 解出 · ${scoreMsg}`
     :`Solved in ${moves} moves · ${timeStr} · ${scoreMsg}`;
+  try{onSolved();}catch(e){console.error('onSolved failed',e);}
   document.querySelectorAll('.cell.state-queen').forEach((el,i)=>{
     setTimeout(()=>{el.style.transform='scale(1.18)';setTimeout(()=>el.style.transform='',200);},i*55);
   });
@@ -3279,7 +3465,7 @@ function restartBoard(){
   for(let r=0;r<N;r++){const l=$(`rl-${r}`);if(l)l.classList.remove('hi-err');}
   for(let c=0;c<N;c++){const l=$(`cl-${c}`);if(l)l.classList.remove('hi-err');}
   updateStats(false);
-  if(wasSolved){stopTimer();resetTimerAndStart();}
+  if(wasSolved){stopTimer();resetTimerAndStart();resetAssist();updateChHud();}
 }
 
 // ── SEED EXPORT / IMPORT ──────────────────────────────────────────────
@@ -3305,34 +3491,13 @@ function importSeed(){
   const raw=$('seed-textarea').value.trim();if(!raw)return;
   try{
     const seed=JSON.parse(atob(raw));
-    if(!seed.n||!seed.regions||!seed.solution)throw new Error('invalid');
-    closeSeedModal();genAborted=true;
-    setTimeout(()=>{
-      genAborted=false;stopTimer();
-      $('loading').style.display='none';$('board-wrapper').style.display='inline-grid';
-      $('stats-strip').style.display='flex';$('win-banner').classList.remove('show');
-      $('msg-bar').className='';$('msg-bar').style.display='none';
-      $('hint-detail').className='';$('hint-detail').style.display='none';
-      $('solution-steps').classList.remove('visible');
-      $('sol-toggle').textContent='Show';solutionVisible=false;
-      hintTier=-1;hintPool=[];hintIdx=0;activeHint=null;lastTapCell=null;
-      clearHintFx();
-      clearTimeout(conflictTimer);clearTimeout(hintClearTimer);
-      N=seed.n;regions=seed.regions;solution=seed.solution;
-      cellState=new Array(N*N).fill(0);moves=0;solved=false;
-      solutionSteps=buildSolutionSteps(N,regions,solution);
-      const sNeedsLH=solutionSteps.some(s=>(s.tier||0)>=7);
-      $('size-select').value=N;
-      $('board-title').textContent=`${N}×${N} Queens Puzzle (Seeded)`;
-      const sDiff=seed.diff||'medium';
-      const sLabel=(sNeedsLH&&sDiff!=='custom')?sDiff+'.':sDiff;
-      $('diff-badge').innerHTML=`<span class="diff-badge diff-${sDiff}${sNeedsLH?' diff-lh':''}" title="${sNeedsLH?'Requires lookahead (trial &amp; contradiction) to solve':''}">${sLabel}</span>`;
-      $('stat-needed').textContent=N;
-      if(autoXOn)$('btn-auto-x').classList.add('on');
-      renderBoard();renderSolutionSteps();updateStats(false);
-      $('stats-strip').style.display='flex';
-            resetTimerAndStart();
-    },10);
+    const n=seed&&seed.n;
+    if(!(n>=4&&n<=12)||!Array.isArray(seed.regions)||seed.regions.length!==n*n||
+       !Array.isArray(seed.solution)||seed.solution.length!==n)throw new Error('invalid');
+    closeSeedModal();chExit();
+    loadFixedPuzzle({n,regions:seed.regions,solution:seed.solution,
+      diff:String(seed.diff||'medium').replace(/\.+$/,''),kind:'seed'});
+    $('size-select').value=N;
   }catch(e){
     $('seed-modal-desc').textContent='⚠ Invalid seed. Please check and try again.';
     $('seed-modal-desc').style.color='var(--err)';
@@ -3402,6 +3567,7 @@ let editDragging=false;
 
 function enterEditMode(){
   if(editMode)return;
+  chExit();
   editMode=true;
   genAborted=true;
   stopTimer();
@@ -3418,6 +3584,7 @@ function enterEditMode(){
   $('hint-detail').className='';$('hint-detail').style.display='none';
   $('win-banner').classList.remove('show');
   $('edit-mode-ui').style.display='';
+  updateChHud();
   $('loading').style.display='none';
   $('board-wrapper').style.display='inline-grid';
   buildEditPalette();
@@ -3606,7 +3773,8 @@ function validateAndStartCustomGame(){
     cellState=new Array(N*N).fill(0);
     moves=0;solved=false;undoStack.length=0;wrongQueenPhase=0;wrongQueenCell=null;applyStepIdx=0;
     solutionSteps=buildSolutionSteps(N,regions,solution);
-    $('board-title').textContent=`${N}×${N} Custom Queens Puzzle`;
+    curMeta={kind:'custom',diff:'custom'};resetAssist();
+    $('board-title').textContent=tf('boardTitleCustom',{n:N});
     $('diff-badge').innerHTML=`<span class="diff-badge diff-custom">custom</span>`;
     $('stat-needed').textContent=N;
     autoXOn=false;$('btn-auto-x').classList.remove('on');
@@ -3642,9 +3810,20 @@ $('btn-import').addEventListener('click',()=>{if(editMode)exitEditMode();openSee
 // Also need a btn-generate binding (defined after edit-mode block now needs it here)
 document.getElementById('btn-generate').addEventListener('click',()=>{if(editMode)exitEditMode();initPuzzle(parseInt($('size-select').value),$('diff-select').value,parseInt($('single-select').value)||0);});
 $('sol-toggle').addEventListener('click',()=>{
+  const b=$('sol-toggle');
+  // In Challenge mode, revealing the solution caps the level at 1★ — ask once.
+  if(!solutionVisible&&chMode&&!solved&&!assist.sol){
+    if(!b.dataset.armed){
+      b.dataset.armed='1';b.textContent=t('solConfirm');
+      clearTimeout(b._armT);b._armT=setTimeout(()=>{delete b.dataset.armed;if(!solutionVisible)b.textContent=t('solShow');},3000);
+      return;
+    }
+    delete b.dataset.armed;clearTimeout(b._armT);
+  }
   solutionVisible=!solutionVisible;
+  if(solutionVisible)noteAssist('sol');
   $('solution-steps').classList.toggle('visible',solutionVisible);
-  $('sol-toggle').textContent=solutionVisible?'Hide':'Show';
+  b.textContent=solutionVisible?t('solHide'):t('solShow');
 });
 $('btn-apply-step').addEventListener('click',(e)=>{e.preventDefault();
   if(!solutionSteps.length)return;
@@ -3675,6 +3854,7 @@ $('win-btn-solution').addEventListener('click',()=>{
   $('win-banner').classList.remove('show');
   // Restart board and begin applying solution steps from step 1
   restartBoard();
+  noteAssist('sol');
   setTimeout(()=>{
     solutionVisible=true;
     $('solution-steps').classList.add('visible');
@@ -3693,7 +3873,7 @@ $('win-btn-solution').addEventListener('click',()=>{
 // ═══════════════════════════════════════════════════════════════════════
 const I18N={
   en:{
-    subtitle:'LinkedIn Game Simulator & Trainer',
+    subtitle:'Logic Puzzle Simulator & Trainer',
     boardSize:'Board Size',difficulty:'Difficulty',singleAreas:'1-cell areas',
     diffEasy:'Easy',diffMedium:'Medium',diffHard:'Hard',diffIntensive:'Intensive',diffAdvanced:'Advanced ★',diffMaster:'Master ★★',diffCustom:'Custom…',
     btnGenerate:'⚡ Generate',btnRandom:'🎲 Random',btnCreate:'✏ Build',btnSeed:'⬆ Seed',btnLoad:'⬇ Load',
@@ -3776,9 +3956,51 @@ const I18N={
     rule5:'Click cycle: empty → ✕ → ♛ → empty',
     rule6:'Right-click = place ♛ directly',
     rule7:'Drag from empty = bulk ✕; drag from ✕ = erase',
+    // persistence / theme / about
+    thRandom:'🎲 Random',
+    aboutNote:'This game was inspired by LinkedIn\'s daily puzzle games. Its rules are the same as LinkedIn\'s Queens.',
+    boardTitleSeeded:'{n}×{n} Queens Puzzle (Seeded)',boardTitleCustom:'{n}×{n} Custom Queens Puzzle',
+    storageOff:'Progress can\'t be saved in this browser (storage is blocked).',
+    // challenge mode
+    chTitle:'🏆 Challenge',chLevels:'🗺 Levels',chStart:'▶ Start · Level 1',chContinue:'▶ Continue · Level {n}',
+    chDoneAll:'🏆 Track complete — replay',chLvTip:'Level {lv} · {n}×{n}',
+    chProgFmt:'{c}/{t} cleared · ★ {s}/{m} · Chapter {ch}/{chs}',
+    chRankNext:'★ {s} · next {ic} {name} at {need}',chRankMax:'★ {s} · top rank',
+    rk0:'Pawn',rk1:'Knight',rk2:'Bishop',rk3:'Rook',rk4:'Queen',rk5:'King',rk6:'Grandmaster',
+    chBoardTitle:'{n}×{n} · {track} · Level {lv}/{tot}',
+    hudBoss:'👑 BOSS',hudPar:'🎯 Par',hudHints:'💡 Hints',hudBest:'🏅 Best',hudSol:'🔑 Solution viewed — max ★',
+    hudPrev:'◀ Prev',hudNext:'Next ▶',
+    chBossKicker:'Boss level',chBossName:'Level {n}',chBossDesc:'A tougher board guards the end of this chapter.',
+    chLevelClear:'♛ Level Clear! ♛',chBossWin:'👑 Boss Defeated! 👑',chWinLevel:'{track} · Level {lv} / {tot}',
+    chWinInfo:'⏱ <b>{time}</b> · 🎯 par {par} · 💡 {h}',
+    chNewBest:'★ New best!',chFirstClear:'First clear',chSolNote:'🔑 Solution was viewed — capped at ★',
+    chNext:'Next Level ▶',chRetry:'↺ Retry',chMap:'🗺 Levels',chTrackDoneBtn:'🏆 View Levels',
+    chTrackDone:'🏆 Track complete! All {t} levels cleared.',chChapterPerfect:'⭐ Chapter {c} perfected — 3★ on every level!',
+    chRankUp:'{ic} Rank up! You are now a {name}.',chUnlocked:'🔓 Level {n} unlocked',
+    pbNew:'🏅 New personal best for {n}×{n} {d}! (was {prev})',pbFirst:'🏅 First {n}×{n} {d} time recorded: {time}',
+    solConfirm:'Sure? (max ★)',streakTip:'{n}-day solving streak',streakFmt:'🔥 {n}',
+    achTitle:'🏅 Trophies',achKicker:'Trophy unlocked',achReset:'Reset progress',
+    achResetConfirm:'Erase all challenge progress, stars, trophies and stats saved on this device?',
+    stWins:'Wins',stStars:'Stars',stBosses:'Bosses',stPerfect:'3★ levels',stStreak:'Best streak',stTrophies:'Trophies',
+    achN_first_win:'First Crown',achD_first_win:'Solve your first puzzle.',
+    achN_wins25:'Veteran',achD_wins25:'Solve 25 puzzles.',
+    achN_wins100:'Centurion',achD_wins100:'Solve 100 puzzles.',
+    achN_ch_start:'Into the Gauntlet',achD_ch_start:'Clear your first Challenge level.',
+    achN_boss1:'Boss Slayer',achD_boss1:'Defeat a boss level.',
+    achN_boss10:'Boss Hunter',achD_boss10:'Defeat 10 boss levels.',
+    achN_perfect1:'Flawless',achD_perfect1:'Earn 3★ on a Challenge level.',
+    achN_perfect25:'Perfectionist',achD_perfect25:'Earn 3★ on 25 Challenge levels.',
+    achN_chapter:'Chapter Master',achD_chapter:'Earn 3★ on all 5 levels of a chapter.',
+    achN_speed:'Lightning',achD_speed:'Clear a level in under half its par time.',
+    achN_pure:'Pure Logic',achD_pure:'Clear an Intensive, Advanced or Master level with no hints.',
+    achN_master10:'Master Mind',achD_master10:'Clear 10 Master levels.',
+    achN_explorer:'Explorer',achD_explorer:'Clear level 1 in all six tracks.',
+    achN_track:'Gauntlet Champion',achD_track:'Clear all 50 levels of a track.',
+    achN_streak3:'On Fire',achD_streak3:'Solve puzzles 3 days in a row.',
+    achN_streak7:'Devoted',achD_streak7:'Solve puzzles 7 days in a row.',
   },
   zh:{
-    subtitle:'领英 Queens 模拟器与训练器',
+    subtitle:'逻辑谜题模拟器与训练器',
     boardSize:'棋盘大小',difficulty:'难度',singleAreas:'单格区域',
     diffEasy:'简单',diffMedium:'中等',diffHard:'困难',diffIntensive:'高强度',diffAdvanced:'进阶 ★',diffMaster:'大师 ★★',diffCustom:'自定义…',
     btnGenerate:'⚡ 生成',btnRandom:'🎲 随机',btnCreate:'✏ 新建',btnSeed:'⬆ 种子',btnLoad:'⬇ 载入',
@@ -3854,6 +4076,46 @@ const I18N={
     rule5:'点击循环：空 → ✕ → ♛ → 空',
     rule6:'右键 = 直接放置 ♛',
     rule7:'从空格拖动 = 批量 ✕；从 ✕ 拖动 = 擦除',
+    thRandom:'🎲 随机',
+    aboutNote:'本游戏受 LinkedIn（领英）每日益智游戏启发而制作，游戏规则与 LinkedIn 的 Queens 相同。',
+    boardTitleSeeded:'{n}×{n} 皇后谜题（种子）',boardTitleCustom:'{n}×{n} 自定义皇后谜题',
+    storageOff:'当前浏览器无法保存进度（本地存储被禁用）。',
+    chTitle:'🏆 闯关',chLevels:'🗺 关卡',chStart:'▶ 开始 · 第 1 关',chContinue:'▶ 继续 · 第 {n} 关',
+    chDoneAll:'🏆 本线已通关 — 重玩',chLvTip:'第 {lv} 关 · {n}×{n}',
+    chProgFmt:'已通关 {c}/{t} · ★ {s}/{m} · 第 {ch}/{chs} 章',
+    chRankNext:'★ {s} · 下一段位 {ic} {name}（{need}★）',chRankMax:'★ {s} · 最高段位',
+    rk0:'兵',rk1:'骑士',rk2:'主教',rk3:'战车',rk4:'皇后',rk5:'国王',rk6:'特级大师',
+    chBoardTitle:'{n}×{n} · {track} · 第 {lv}/{tot} 关',
+    hudBoss:'👑 首领关',hudPar:'🎯 标准用时',hudHints:'💡 提示',hudBest:'🏅 最佳',hudSol:'🔑 已查看解答 — 最多 ★',
+    hudPrev:'◀ 上一关',hudNext:'下一关 ▶',
+    chBossKicker:'首领关',chBossName:'第 {n} 关',chBossDesc:'本章结尾由一块更难的棋盘把守。',
+    chLevelClear:'♛ 过关！♛',chBossWin:'👑 击败首领！👑',chWinLevel:'{track} · 第 {lv} / {tot} 关',
+    chWinInfo:'⏱ <b>{time}</b> · 🎯 标准 {par} · 💡 {h}',
+    chNewBest:'★ 新纪录！',chFirstClear:'首次通关',chSolNote:'🔑 查看过解答 — 最多 ★',
+    chNext:'下一关 ▶',chRetry:'↺ 重玩',chMap:'🗺 关卡',chTrackDoneBtn:'🏆 查看关卡',
+    chTrackDone:'🏆 本线全部 {t} 关通关！',chChapterPerfect:'⭐ 第 {c} 章完美 — 每关都是 3★！',
+    chRankUp:'{ic} 段位提升！你现在是「{name}」。',chUnlocked:'🔓 已解锁第 {n} 关',
+    pbNew:'🏅 {n}×{n} {d} 新个人最佳！（原 {prev}）',pbFirst:'🏅 首个 {n}×{n} {d} 记录：{time}',
+    solConfirm:'确定？(最多★)',streakTip:'连续 {n} 天解题',streakFmt:'🔥 {n}',
+    achTitle:'🏅 成就',achKicker:'成就解锁',achReset:'重置进度',
+    achResetConfirm:'确定清除本设备上保存的全部闯关进度、星星、成就和统计吗？',
+    stWins:'胜场',stStars:'星星',stBosses:'首领',stPerfect:'3★ 关卡',stStreak:'最长连续',stTrophies:'成就',
+    achN_first_win:'初戴王冠',achD_first_win:'解出第一道谜题。',
+    achN_wins25:'老练棋手',achD_wins25:'累计解出 25 道谜题。',
+    achN_wins100:'百战之王',achD_wins100:'累计解出 100 道谜题。',
+    achN_ch_start:'踏上征途',achD_ch_start:'通过第一个闯关关卡。',
+    achN_boss1:'首领杀手',achD_boss1:'击败一个首领关。',
+    achN_boss10:'首领猎人',achD_boss10:'击败 10 个首领关。',
+    achN_perfect1:'完美无瑕',achD_perfect1:'在闯关中获得一次 3★。',
+    achN_perfect25:'完美主义者',achD_perfect25:'在 25 个闯关关卡获得 3★。',
+    achN_chapter:'章节大师',achD_chapter:'一章 5 关全部 3★。',
+    achN_speed:'闪电',achD_speed:'用时不到标准用时的一半通关。',
+    achN_pure:'纯粹逻辑',achD_pure:'不用提示通过一关高强度 / 进阶 / 大师关卡。',
+    achN_master10:'大师之心',achD_master10:'通过 10 个大师关卡。',
+    achN_explorer:'探索者',achD_explorer:'六条难度线的第 1 关全部通过。',
+    achN_track:'闯关冠军',achD_track:'通关任意一条难度线的全部 50 关。',
+    achN_streak3:'渐入佳境',achD_streak3:'连续 3 天解题。',
+    achN_streak7:'持之以恒',achD_streak7:'连续 7 天解题。',
   }
 };
 // Region color name → Chinese
@@ -3973,12 +4235,13 @@ function applyLang(lang){
   const winH=document.querySelector('.win-card h3');if(winH)winH.textContent=dict.winTitle;
   setTxt('win-btn-generate','winNew');setTxt('win-btn-random','winRandom');setTxt('win-btn-solution','winSolution');
   // Board title (if a game is loaded)
-  if(regions.length&&!editMode)$('board-title').textContent=tf('boardTitleFmt',{n:N});
+  if(typeof refreshBoardTitle==='function')refreshBoardTitle();
   // Re-render dynamic hint/solution content in the new language
   if(typeof renderLegend==='function'&&regions.length)renderLegend();
   if(typeof renderSolutionSteps==='function'&&solutionSteps&&solutionSteps.length)renderSolutionSteps();
   // Re-show current hint in new language if one is active
   if(activeHint&&typeof reshowActiveHint==='function')reshowActiveHint();
+  if(typeof chAfterLang==='function')chAfterLang();
 }
 function t(key){return (I18N[curLang]&&I18N[curLang][key])||I18N.en[key]||key;}
 // Localize a hint's short text at display time (works for live hints & stored steps)
@@ -4025,17 +4288,24 @@ function doToggleTheme(){
   const now=Date.now();
   if(now-_themeToggleLock<400)return;  // debounce double-fire (touchend+click)
   _themeToggleLock=now;
-  toggleMode();showThemeName();
+  toggleMode();
+  if(themePref!=='random'){themePref=currentTheme;SAVE.prefs.theme=themePref;persist();}
+  showThemeName();
 }
 $('theme-toggle').addEventListener('click',doToggleTheme);
 $('theme-toggle').addEventListener('touchend',e=>{e.preventDefault();doToggleTheme();},{passive:false});
-$('theme-select').addEventListener('change',e=>{setTheme(e.target.value);showThemeName();});
+$('theme-select').addEventListener('change',e=>{
+  const v=e.target.value;
+  if(v==='random'){themePref='random';applyAutoTheme();}
+  else{themePref=v;setTheme(v);}
+  SAVE.prefs.theme=themePref;persist();showThemeName();
+});
 function showThemeName(){
   const tt=$('theme-toggle');if(!tt)return;
   tt.title=THEMES[currentTheme].name+' — tap to switch mode';
 }
 // ── Language select ──
-$('lang-select').addEventListener('change',e=>applyLang(e.target.value));
+$('lang-select').addEventListener('change',e=>{applyLang(e.target.value);SAVE.prefs.lang=e.target.value;persist();});
 
 // ── Custom difficulty modal ──
 function syncCustomLabels(){
@@ -4071,15 +4341,600 @@ $('diff-select').addEventListener('change',e=>{
   if(e.target.value==='custom')openCustomModal();
 });
 
+// ═══════════════════════════════════════════════════════════════════════
+// PERSISTENCE — optional localStorage save (prefs, challenge progress,
+// stats, trophies, in-progress board). Every access is guarded: if storage is
+// blocked (private mode, sandboxed preview) the game runs from memory only.
+// ═══════════════════════════════════════════════════════════════════════
+const APP_VERSION='2026-10-26 23:53 UTC';
+const STORE_KEY='queensPuzzle.save.v1';
+let storageOK=true;
+function defaultSave(){
+  return{v:1,
+    prefs:{theme:'random',lang:null,size:8,diff:'intensive',chTrack:'easy',lastCh:null},
+    ch:{},                                    // ch[diff].lv[level]={s:stars,t:bestSeconds|null}
+    stats:{wins:0,days:0,streak:0,bestStreak:0,lastDay:'',speed:0,pure:0},
+    pb:{},                                    // free-play personal bests: pb['8-intensive']=seconds
+    ach:{},                                   // ach[id]=unlock timestamp
+    resume:null};                             // in-progress board snapshot
+}
+let SAVE=defaultSave();
+function loadSave(){
+  try{
+    const raw=localStorage.getItem(STORE_KEY);
+    if(!raw)return;
+    const d=JSON.parse(raw);
+    if(!d||typeof d!=='object')return;
+    const base=defaultSave();
+    SAVE={...base,...d,
+      prefs:{...base.prefs,...(d.prefs||{})},
+      stats:{...base.stats,...(d.stats||{})},
+      ch:d.ch&&typeof d.ch==='object'?d.ch:{},
+      pb:d.pb&&typeof d.pb==='object'?d.pb:{},
+      ach:d.ach&&typeof d.ach==='object'?d.ach:{}};
+  }catch(e){storageOK=false;console.warn('Save could not be read',e);}
+}
+function persist(){
+  try{localStorage.setItem(STORE_KEY,JSON.stringify(SAVE));storageOK=true;}
+  catch(e){storageOK=false;}
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// CHALLENGE MODE — 6 tracks × 50 hand-picked levels (pre-generated offline
+// by tools/build-challenge-levels.js and graded by the same solver).
+// Every 5th level is a BOSS: drawn from the hardest band of its track.
+// Level code: size char ('5'–'9','a'=10) + n² region digits + n solution digits.
+// ═══════════════════════════════════════════════════════════════════════
+const CH_DATA={/*CH_DATA_BEGIN*/
+easy:'5011130211322113224332443303142,6133022113022133022133322533442533422315240,6110000510000510200514233554233555555413520,5302113021132211332413344114203,8000111113001115133221151632444556324455562245555622455576655555725314607,6000022011022111022113022433222445552315204,6444053142053142053144453144453115555302514,6000000001000111002334442555444544444425130,5122031220312233142331423330241,702222220042212444221344442334444555466656644666660536142,710055551155522444555244433554433335446635544466662064153,714400221140002144002244443524444352644445264444423164250,6111100110102110002333222433333444553415203,6400001422331423333425333455533555333351402,8000000020100044211300422333044443300044453306447553064470000444731625047,711222003112202312222231666665111664556666456666665240613,6000000002221022331442231242533222533052413,6111100111320111320413350443355333555514203,700012220001122000322200332226005442660554260000021462530,9000000000000123333050122223051122223051542223055542623055442663075222866775522866035842716,700022220022211602121362211136544333655663366666660526314,6000002111002444022344022334422552222425031,5111103112031120314223142241302,8001111223331444233333442535444465557746677577666777776667777777703715264,a33111110023311499902344449999234444499994444449999866444995587644449998777479999887777779989999999997390482516,6000011000111031122035114005444055554035142,8000000000000312200003122440633524706555577666655766666657766655525740631,720001112001113220001300001130000413564441356611113516402,5111001100231112344444444431402,720011112001111220311122031112203341523334452333662413506,8444444031444440314422003444443334444443344445533664455536644577360372415,6000000000011200011233041233441555441350241,8000277110002711133227111333571413355744133357461333374617777711117205364,700000000001000211111122241312244533264455326333336305241,722444402511440255444455344445536644556644455566666302514,6000222002211002231002231044533005555052413,8333320003232201132222444332224442222224422522244655224446662777457316204,9000444112030441112030441122834444112844444111844441115866641775888841777844441177257148360,5004110041302443024434444303142,722222002122222314222234442223334225364422566622555140362,700000000011133022213304441330444333054433355556630426315,8100222221001122211112222113112243331114433315111663553373333333713526407,5002223021132241322413224114203,5000010001120013204134441113042,9000011114000012114522222214533222114533222144532211146572222226772888222722228222364270815,8002331110223333100223333000333634055336645555366775533667775555517350462,700111110311111333144233333425333344533366433336441362504,6111001111111111212331222344422355522425031,9600000000600250001662255551666633551666444551666655555666665555665565575688555577482536071,700000000100000115524011352401335540633544466344446142530',
+medium:'9000000111523333331525553333554553666554555566555555556555557566555577886555555866381520746,8000001112200111122211111322111113222211462222544662555556225775536207514,a44440055513444405551343442555133342255553444555555334454555533644455557664444595777448899544449999994951372068,5000114200142331444314333324130,710000001000002111133233333224433523333352336633335063142,8000000000000010102000111221111132247733352477773524666772227777735172046,a66666666606666661000526661111052664661335226466116556666666656666688665566677888566666686859966666689618403572,700223330112233022223352222335444222555462255566620246315,6002211022331022333222233422533455553152403,720000002111110222141131114113111441355554455666446420513,a00777711172222277717442277777744433377774777577777477757776747775777664447777767444877777744488879971825049637,a22222001112222223331222333333322222223332445566338225566638827799968882272298889222229898922229999995907136284,8000000032200113302200113000000330040003344445555666455774444444735162407,5210002111024433444334444442031,9555555000551112222522222222522222232554442233254422222222222622782222626788222666835741602,5200112111121413224132444413042,5203112031122311223342223413024,5001330211302213224332243303142,a00001111320444111332000443332200444433320554555552005555555565555555996575555599657555559866775559981486350297,9111100000111100222111000022511302222573344222578622226578666226778866666777888666627350814,a20111111542033155554233555554433355555543366665554366555555533666555856666777588666999788866999988881402973685,a33330000003411222220344442880037748888667774888566777778556677778888667787788866988888866699666666668250379461,6000000100030102333112223142223445523402513,733300001132220113332541535554555555666656666666666153042,700322220333122443311244333324553666655366666666661463025,5000002113024130444304433042031,8111102221100022200000225223322554222222542222255226222572662225741530627,a00000000010020001101202001111122230311412333031141233333544122633355112266611117988811117799888811114705862931,a55001111115522223331555222433352222243335544244333555424433355444466339557446668955756668895555566662947516380,9222000000271118000277788800277788803244788533224788538266788588277788888222288888740826135,6322220312220312222314225314225314255513024,6220011220011222331222311422331445551251304,8000011442220014433255544366555746665557455655577566575775555777735207416,9000000011002224113002224443022244433022244443222224453262224455668227444668227777063847152,700011110311111333112234311124433522666656666666661352046,8100022441222222411112244135522241355224455555222555522265775522630516472,a44002133337442213333744222333374455553557444555555777799995577666699997669969998666699999899999999992537184096,a11100009991110009999111120999913222099991358849999155884669911888866971188899997818888999988888899996041527938,8110033331222333312222235177233354472333547722555776666557775555530461752,8333001113300115133255555332555556444455766665577667777777777777747203516,8220011112222222122222221222222334442233354422233577726335776663337462051,8110000331102053311625533446555536465657766666577666677776667777740371526,a11100000441110022044111333204453333344445333334444555533344466544344478855444447855549994755544944477264831905,8330000113320011133220044342440444444404444544444555554645776666657304261,9010000000011002222010022222000022332000422232050482222550488226000478226000778886025731846,6111033112033122233145553145533145555302514,6003311233314233314222314225334225333140352,a00011112220111211223000122222311111222331111443333555443333355644333335666633337566668837755588899971368402957,9000333333020001113224433313444444333455544453455555556444444456744444456778844456251746803,700000001000000122222013344225533422552222256666626052413',
+hard:'9000333332000133322000133322001133333004111113554111111554411617444446667444448877137420685,5332203122031122322224444441302,9100000000110000220111102222111000322411333333455533333555533363877776666888666666518603742,a00000000007000001100777200010072220000037554400003757466660977799996097888996669888899666989999999998639417025,8000000000004211103042222034422220444446604444556007744660074444406413572,711111101110000111112044131204333333466555346333336253041,6033222031125331425331445344445344555024135,9000000000220201111222244411322741116377744416377541116375544166374444168344444168462053718,8111002221222222255552446333544463555554633556666555557665555577730416275,8000111110111111100011112003112220031146656611446566666665566776613725064,a00000000001110000000111120003011112200334111133333444333555547455555654777888565499998555544955555557149068352,702222220221111222131122443112243315224661522261150514263,8000000551444445512244455112243354444455544444545666744457777445550264713,8000000002200001120031001000311110000011460055544660575446600755426037514,9442222220444122220444122222441132222444332552444342252664444452866777452844444452836427150,5001112031123314233143311413024,a01113333330011133222004333222204433332220044322222703333552277333385567773338856797555855579755555550485379261,8000000002001000021113000222334402223444055534444333366447736666473046251,9100000333100003303110200003111220033111443333115547736117777736118833733888833333503742861,8533011115330001153002014533326645363666456666666766666667766666636427051,6322200311220313420333420544420522222524130,9300000011330662221334666266334666666334466666333335566333333666337777666333888666186035724,700022231002223152222355224435555444554544655444662036415,700000000000122004011204433110411111446115146666550463152,9333000008330010888230314888233334888236344888336664558333664888773444888733888888640257318,711112021112202111122233111225511224511162455566225241603,6000111000111020111425531455331455555251403,6111000110024111024113324111344155334304251,a22225555051112555505122225350512233335551143533555774555555577766655958777766599877666655977766555598146275309,8000000442010044421114445113334456677744567777775666777776667777742035716,a29999033332990000113299903003329995333334499588866499959986699975988699997598899999999889999999999995709148362,a05553333110255333331025553333155555534335555553443855553344388855366448885777664888574444489999444440916837524,6000000011222011222031422034425034225024135,6000000244431243331543333543553555533250413,9000001111000111221000013221004003888504088888500000668777777688777877888888888888137520648,711100061210666122066322266634456663455566666666664026135,700002240015524111522433552445555664555556655555660241635,5200112223142331422314333324130,5000002113024130243302433342031,9222222000111244030122224033112244003255244444225244644222224644777744666788444446704852631,5300113022130221332413334414203,6000000222100211140253140553144555444530241,a00000000001100505000111355500241133552024155555222411555522246685572224688557292468855229244555522927194052638,a00000000012000334441223333344123333334442233334444522344444455444446665778844666578884469958844444995913607248,8000000220100000201332222111322221122225411115254661555556677775551637402,8331000003310555233115552333554553434445544445555644455556664557742713506,9000000022001111122033322224033325224337755544333756666377766666337333338333333338035174628,6000000022111002111022413055413055111042531,9000000000000000111000011112000381122400381115408888855478868855476668885444488885268307415,8000006660111226611552666335524665555544655755746557757467777774402416375',
+intensive:'9200111111220111444323144444333344444355344444375554444377555546776666666777888866251374806,5000010211102113422234443303142,8000000000333333100023111004233330642333306423355066222256677777507352614,5000010221102113222434444303142,8000000220101000211111202133322024443322246553255466533574465555741530627,6000222011222331332433352444452455552025314,9333000001300021111330222221433352521453552511555552551866555555886666557886777777475306281,711100021313022331302453332245333344553544655556663052614,6233000223011223044333334355544554444350241,a00000000001111110000222111011322211111332421115333244444555344665555534666757733477777778399998888887509162483,a00000001120400101112045011122244553152224455355252444535525555555555565755566666977755688699988888863684059172,6000001200111202131222333233344554444240351,9222000000200000113222303133233333334222353444222253334622555534665585574668887777361584072,a01111111110211111444022414444402444433442222422344225222333425555666342577666634258777688425888888990416825379,a33311022223111100022333220202233332222223553344666335584467738888966973888899997333899777733333999995140627938,5222202110022111433334444342031,8222000001200404312244443444433437464433374644445776666657776555560253741,9340012222344012222344002220344400000666444555666655557677657777677777887678888888246057318,a11000000001102222020111122222344133233334414333333444435533364655555336666657553686977773388899997778079352614,8031111110333114122231141255331442253444472534466755544467777666605146273,5001113002130222322443334414203,5300013020130244322243344414203,9200000011222011113442233333422535335446555555776558558766588588777588888555588888573614208,8211000002111100021144000222240037255444377566433755763337777633363075241,9004422222001424426011444226031446666533544666555554466555666666556666677888886777027153684,a60000000006001100000611100002061113022226133300544618833555466683333549868833774988887337497777777745384961720,6111000120044122244333244355554355555403152,5222202110024103241334443342031,a00004221330004422113444422111343333231334434333333443443353364445555556644448577966668877799668888872846370951,a11100002221111000022111222222211111322441113333224151166332475555636247758666624779888864499966666666385917042,9221111100211311330223331333422331133422331333444433335446636655477666858776666888741308526,9100000000111102220311100200313112222333133254333335554638577755668577775688555555736285041,700012220301122331122543335554444555666465566666661352064,722310002331110223314425534445544444564666456666446413502,9300000012301111112300333122333332222355334442335333344385444446385455766885555777147352860,700011110223331223331142333334233335445555544455662614035,6200111211131222131223333224555444445130425,a20000000112200311116200033161644403516664455555569888885666977778889697778889999777888899999999999993704158269,8331155003111522233155626351546665555444656566666566676665577777671604253,8000000012000011120011131222222314444333344553363455773665557766625061374,700011220111112111122231222243522624555564455666661350624,8000022220111123201141332001433321114332277444455766645557444444514753620,5100001220311233144434433330241,a00000001113333333311222311111122233334418226343411886644441578666444557888645455799864555579955555556825794031,8222200003312220031111200333122225311112453333364553773645537774442517063,710000001102222314422231422423342442364444566655553150462,5000010211102233442434444303142,5100001112042223423334443330241,a12222220331122222003122242223312224433333324443993533344399355633337995566833779556888877956666667997136402859,8200000772011100722111077221433371114443765554437666543377777777753164207',
+advanced:'5100001120211222414234443330241,6000000041122041112041322044335443355025314,6011113024113024133224335544335555555031425,6111000121110221314233334222234255554420351,8200001112233000122333333423336654233666542446565444665554666557727140536,700000010010111011112203315523364452366645236664550461352,5220002111021330411304413042031,5100021102213024130243344420314,5001110022132241322413334414203,a22202222215200222311522223233152233333115222231114552627144456666774445558667744999888874797777777773826914750,700000001011120111222033332203443320444622546665554053162,6110000111122133332113222433335444355315204,5111001220014223142234433330241,5000020102231222333243444431402,9211133300221333304223336604333536604775556444775556446766656666777656886766666686820463517,5000011111113132433324422231420,5110001122022223433334444330241,6000111022221042231442333452555455555152403,700001110330021033322243334444444444555444455556662641305,8112200051322002513322225434442554445455546455555466675554447775560314725,6222000200001222331543331544431551111351420,5100001111113132433324442231420,711100331112033142200314233331455535644553566655554035162,730002223100002313330233300025533344553364455556663162504,9433331200444431200443333220455363366445563366555666666866667766868887766888877766857302461,6000000200101203111203333254433555553130524,8200111112211144121133455222334756626447566666675676676757777777514035726,6400000402101432111433333433553555533152403,6022221002111222231554333544443555443042531,8100000001112000513120205331222253314445531111657361116573666667742503617,702111110221331223333124463552246335444635566663550614253,6110033100033122223222333242235444445302415,710000221111002311112233412226345522634652566665554150263,720011112000331223033142303334233353423555644455662614035,8220000002000111022222155244435552243357766665577766757777777777736042517,711332001333200532224453326445552664552266455266665042613,6111002110022111223111423544423555433413520,6000122011122033112433332455522444555135204,9000033333112003333112003333144403333146333333846666533844466555884666575888888777302816475,9000000021033330021033000221333322222333522442375524422375886442377866644337844444486072513,8000000010011111101111212011332221143355211433355164666671666777703742615,8110033331002333310022223442255334442253576442555766665557766666630572641,722200004211100421333042133304463335646663566633335314062,6000001220111422211444331454311553333351420,8000000110300101403021114333221443533244435222666355666775555555726305147,8000020001300222013300200113300041553040477555444766555447777555460527413,8220000114222200142433303444443334546633345567777456666676666667737150246,9444401111442200001444233331446635533466665577467775557667877757666888777688888887483705162,8200000002200001124440031222433315444443355544444575554467777666646053172,a11111111001111122202113311420231333342223135344442333554644438555566773888877779399889999933999999999170536842',
+master:'5000113331422314233142224413024,9111100000133101002333111222331111112334441222344651222666655577655655778655555588537024168,6000001011111412123442223544423533333142530,711100223311222333125234332554432255466555546666654263051,8222222002444511022445511644553316645553366655553675577536777773375162403,700000010011111011132200313224631325463335546655551364052,6220001200301233300333344533444555444350241,9200001113200011333220011353444333353466363653476666653777677778787777878788888888241607358,a11111100001111100002111100422231100444423311042222351444444235566666445556884447566688477756888844996270513948,9333330022111300022133300222133300242333333342533663342577766442557776442888886444618370524,a00000001440222220114223444444423334554442333445544235554455575555445667555555586777777798677777999884713529086,6222000212220111200555203453333455553413502,720031112203331523333155434335544433555463355546662615304,5112001122031420314223144441302,a12222222001133320000133222222213323323421333333342137355544411755664447777564464878766666488879996669172846305,732202113320221332224133424446444444666455566644453640251,8111111001111233311122233111122371422253744465537466655576665577770361425,700000010200111220114423341142364444236444533665551502463,5000004111342223424234442303142,9000000000022001111022223331044466311044556661055556661056666666556766767588777777074613582,8044422220004411244443122466633324446666645555556477777664477776605741362,5000000111142223424234442303142,700000000020011002111322221135262433566444355664431526403,8222200012322030123320333243303532443335524335556273335667777776657031462,9000000001003002211003222111303232222333332244633382544633687544636687555666888888174286053,9111002222153022332553333322533443444533444444553334644533366666883336676888836777408261573,8111000003130422233344552333444523744455537666655776666557765555551724630,9111000000100000002133000002153304402555300402575544422577662222776668822777888222708362415,8550000005003122250031112500331125553346655777466557666675777777724735061,9440222222400023211444423311444424331444444431464333335668333375688377775688333355274638051,700000002111003221100321133335333444553346655554464203516,a22222222201111252200112225222231122522223155552444311552266431158266443333876644883887766688888799999240837516,5200112200142031422314423324130,6111000221110222330542330544430550000531420,8113000003133224031332444333224456364444566664555666646667766666661425730,9443333330411113000444133222445136662455576766555577776577776666555776866557766866817402536,8222222002114422053114220533442605554226055444667455466774444444762513047,a20000000002222011101555222211154552111135444211333556666111188676666618667666111889779661689999966668649207315,6001111201011200041200344223334225554140352,a31000000003102222220311122222033322255203322525420335555542099566574449666857744968885777496555554449182753640,9000000000010200300112220303111444333111455533111111533666655555666855857688888877514736082,8000022220222221100220333000000030040440355444333566333375666377716374025,9001111111222153331244155333444145333854445355854555555855566655877777655888887666180637524,8100111111111121113333222113534441155446415564666177646667766666613647250,9411110000411112220416112333416655553446666653746888855776688885877788855888888885625807314,6001114011144114442333342555442522222135240,9000000000000000111200001113220000013244053333445553633445555666844475766888877766570813642,700001110021111332111432211443244445324466522446551520364,9100000000100020003114422203111423333114444435144463335447666355777786665777785555605728314,8001111110001133300231113552333335522264457726664777277667777777714257063'
+/*CH_DATA_END*/};
+const CH_TRACKS=['easy','medium','hard','intensive','advanced','master'];
+const CH_COLORS={easy:'#26a269',medium:'#1a7fd4',hard:'#d47a00',intensive:'#ff2080',advanced:'#a020f0',master:'#e8a000'};
+const CH_PAR_K={easy:.9,medium:1.2,hard:1.6,intensive:2.2,advanced:3,master:3.5};
+const CH_BOSS_EVERY=5;
+const RANKS=[
+  {min:0,ic:'♙',k:'rk0'},{min:25,ic:'♘',k:'rk1'},{min:75,ic:'♗',k:'rk2'},{min:150,ic:'♖',k:'rk3'},
+  {min:300,ic:'♕',k:'rk4'},{min:500,ic:'♔',k:'rk5'},{min:750,ic:'👑',k:'rk6'}];
+const ACH=[
+  {id:'first_win',ic:'👑',test:s=>s.wins>=1},
+  {id:'ch_start', ic:'⚔️',test:s=>s.clears>=1},
+  {id:'perfect1', ic:'✨',test:s=>s.perfect>=1},
+  {id:'boss1',    ic:'🐉',test:s=>s.bosses>=1},
+  {id:'speed',    ic:'⚡',test:s=>s.speed>=1},
+  {id:'pure',     ic:'🧠',test:s=>s.pure>=1},
+  {id:'chapter',  ic:'⭐',test:s=>s.perfectChapters>=1},
+  {id:'streak3',  ic:'🔥',test:s=>s.bestStreak>=3},
+  {id:'wins25',   ic:'🎖️',test:s=>s.wins>=25},
+  {id:'explorer', ic:'🧭',test:s=>s.tracksStarted>=CH_TRACKS.length},
+  {id:'boss10',   ic:'🗡️',test:s=>s.bosses>=10},
+  {id:'perfect25',ic:'💎',test:s=>s.perfect>=25},
+  {id:'master10', ic:'🎓',test:s=>s.masterClears>=10},
+  {id:'streak7',  ic:'📅',test:s=>s.bestStreak>=7},
+  {id:'track',    ic:'🏆',test:s=>s.tracksDone>=1},
+  {id:'wins100',  ic:'🏛️',test:s=>s.wins>=100},
+];
+
+let chMode=null;                                // {diff,level} while playing a challenge level
+let assist={hints:0,sol:false,recorded:false};  // per-board help usage (drives stars / PB eligibility)
+let curMeta={kind:'gen',diff:'intensive'};      // what is on the board: gen | seed | custom | ch
+let lastWin=null;
+const _chCodeCache={};
+
+function chCodes(diff){
+  if(!_chCodeCache[diff])_chCodeCache[diff]=(CH_DATA[diff]||'').split(',').filter(Boolean);
+  return _chCodeCache[diff];
+}
+function chDecode(code){
+  const n=code[0]==='a'?10:+code[0];
+  const regions=[],solution=[];
+  for(let i=0;i<n*n;i++)regions.push(+code[1+i]);
+  for(let r=0;r<n;r++)solution.push(+code[1+n*n+r]);
+  return{n,regions,solution};
+}
+function chIsBoss(level){return level%CH_BOSS_EVERY===0;}
+function chTrack(diff){
+  if(!SAVE.ch[diff]||typeof SAVE.ch[diff]!=='object')SAVE.ch[diff]={lv:{}};
+  if(!SAVE.ch[diff].lv)SAVE.ch[diff].lv={};
+  return SAVE.ch[diff];
+}
+function chCleared(diff){                      // levels cleared in sequence from 1
+  const lv=chTrack(diff).lv,tot=chCodes(diff).length;let k=0;
+  while(k<tot&&lv[k+1])k++;
+  return k;
+}
+function chUnlocked(diff){return Math.min(chCodes(diff).length,chCleared(diff)+1);}
+function chTrackStars(diff){const lv=chTrack(diff).lv;let s=0;for(const k in lv)s+=(lv[k]&&lv[k].s)||0;return s;}
+function chTrackName(diff){return t('diff'+diff[0].toUpperCase()+diff.slice(1));}
+function chPar(diff,n,boss){return Math.round(n*n*(CH_PAR_K[diff]||2)*(boss?1.25:1));}
+function chStars(sec,par,a){
+  if(a.sol)return 1;
+  let s=a.hints===0?3:a.hints<=2?2:1;
+  if(sec>par)s=Math.max(1,s-1);
+  return s;
+}
+function fmtTime(sec){if(sec==null)return '—';const m=Math.floor(sec/60),s=sec%60;return `${m}:${String(s).padStart(2,'0')}`;}
+function rankFor(stars){let i=0;while(i+1<RANKS.length&&stars>=RANKS[i+1].min)i++;return{idx:i,...RANKS[i]};}
+function progressSummary(){
+  const s={wins:SAVE.stats.wins||0,speed:SAVE.stats.speed||0,pure:SAVE.stats.pure||0,
+    bestStreak:SAVE.stats.bestStreak||0,clears:0,bosses:0,perfect:0,perfectChapters:0,
+    masterClears:0,tracksStarted:0,tracksDone:0,stars:0};
+  for(const d of CH_TRACKS){
+    const lv=chTrack(d).lv,tot=chCodes(d).length;
+    for(const k in lv){
+      const r=lv[k];if(!r)continue;
+      s.clears++;s.stars+=r.s||0;
+      if(chIsBoss(+k))s.bosses++;
+      if(r.s===3)s.perfect++;
+      if(d==='master')s.masterClears++;
+    }
+    for(let c=1;c+CH_BOSS_EVERY-1<=tot;c+=CH_BOSS_EVERY){
+      let all=true;for(let i=c;i<c+CH_BOSS_EVERY;i++)if(!lv[i]||lv[i].s!==3){all=false;break;}
+      if(all)s.perfectChapters++;
+    }
+    if(lv[1])s.tracksStarted++;
+    if(tot&&chCleared(d)>=tot)s.tracksDone++;
+  }
+  return s;
+}
+function dayKey(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+function bumpDaily(){
+  const st=SAVE.stats,today=dayKey(new Date());
+  if(st.lastDay===today)return;
+  const y=new Date();y.setDate(y.getDate()-1);
+  st.streak=(st.lastDay===dayKey(y))?(st.streak||0)+1:1;
+  st.lastDay=today;st.days=(st.days||0)+1;
+  st.bestStreak=Math.max(st.bestStreak||0,st.streak);
+}
+function liveStreak(){
+  const st=SAVE.stats;if(!st.lastDay)return 0;
+  const today=dayKey(new Date()),y=new Date();y.setDate(y.getDate()-1);
+  return(st.lastDay===today||st.lastDay===dayKey(y))?(st.streak||0):0;
+}
+
+function resetAssist(){assist={hints:0,sol:false,recorded:false};}
+function noteAssist(kind){
+  if(solved)return;
+  if(kind==='hint')assist.hints++;
+  else if(kind==='sol')assist.sol=true;
+  updateChHud();scheduleResumeSave();
+}
+
+function setDiffBadge(diff,lh){
+  if(diff==='customized')diff='custom';
+  const label=diff==='custom'?'customized':(lh?diff+'.':diff);
+  $('diff-badge').innerHTML=`<span class="diff-badge diff-${diff}${lh?' diff-lh':''}" title="${lh?'Requires lookahead (trial &amp; contradiction) to solve':''}">${label}</span>`;
+}
+function refreshBoardTitle(){
+  if(editMode||!regions.length)return;
+  const el=$('board-title');if(!el)return;
+  if(chMode)el.textContent=tf('chBoardTitle',{n:N,track:chTrackName(chMode.diff),lv:chMode.level,tot:chCodes(chMode.diff).length});
+  else if(curMeta.kind==='seed')el.textContent=tf('boardTitleSeeded',{n:N});
+  else if(curMeta.kind==='custom')el.textContent=tf('boardTitleCustom',{n:N});
+  else el.textContent=tf('boardTitleFmt',{n:N});
+}
+
+// Load a fully-specified board instantly (challenge level, seed, resumed game).
+function loadFixedPuzzle(p){
+  genAborted=true;                       // stop any generation still running
+  if(editMode)exitEditMode();
+  chMode=null;
+  stopTimer();
+  $('loading').style.display='none';$('board-wrapper').style.display='inline-grid';
+  $('stats-strip').style.display='flex';$('win-banner').classList.remove('show');
+  $('msg-bar').className='';$('msg-bar').innerHTML='';$('msg-bar').style.display='none';
+  $('hint-detail').className='';$('hint-detail').style.display='none';
+  $('solution-steps').classList.remove('visible');
+  $('sol-toggle').textContent=t('solShow');solutionVisible=false;$('btn-apply-step').style.display='none';
+  hintTier=-1;hintPool=[];hintIdx=0;activeHint=null;lastTapCell=null;
+  clearHintFx();clearTimeout(conflictTimer);clearTimeout(hintClearTimer);
+  N=p.n;regions=Array.from(p.regions);solution=Array.from(p.solution);
+  cellState=new Array(N*N).fill(0);moves=0;solved=false;
+  undoStack.length=0;wrongQueenPhase=0;wrongQueenCell=null;applyStepIdx=0;
+  solutionSteps=buildSolutionSteps(N,regions,solution);
+  setDiffBadge(p.diff,solutionSteps.some(s=>(s.tier||0)>=7));
+  curMeta={kind:p.kind||'seed',diff:p.diff};
+  resetAssist();
+  autoXOn=false;$('btn-auto-x').classList.remove('on');
+  renderBoard();renderSolutionSteps();updateStats(false);
+  refreshBoardTitle();
+  resetTimerAndStart();
+}
+
+function loadChallengeLevel(diff,level){
+  const codes=chCodes(diff);
+  if(!codes.length)return;
+  level=Math.max(1,Math.min(codes.length,level|0));
+  if(level>chUnlocked(diff))return;
+  const p=chDecode(codes[level-1]);
+  loadFixedPuzzle({n:p.n,regions:p.regions,solution:p.solution,diff,kind:'ch'});
+  chMode={diff,level};
+  SAVE.prefs.chTrack=diff;SAVE.prefs.lastCh={diff,level};
+  refreshBoardTitle();updateChHud();renderChPanel();
+  saveResume();
+  if(chIsBoss(level))showToast('👑',t('chBossKicker'),tf('chBossName',{n:level}),t('chBossDesc'),3200);
+}
+function chExit(){
+  if(!chMode&&!SAVE.prefs.lastCh)return;
+  chMode=null;SAVE.prefs.lastCh=null;persist();
+  updateChHud();renderChPanel();
+}
+
+// ── Challenge panel ────────────────────────────────────────────────────
+function renderChPanel(){
+  const panel=$('ch-panel');if(!panel)return;
+  const sel=CH_TRACKS.includes(SAVE.prefs.chTrack)?SAVE.prefs.chTrack:'easy';
+  const sum=progressSummary();
+  $('ch-title').textContent=t('chTitle');
+  const strk=liveStreak();
+  const se=$('ch-streak');se.textContent=strk>=2?tf('streakFmt',{n:strk}):'';se.title=tf('streakTip',{n:strk});
+  const got=ACH.filter(a=>SAVE.ach[a.id]).length;
+  const tb=$('ch-trophy-btn');tb.textContent=`🏅 ${got}/${ACH.length}`;tb.title=t('achTitle');
+  $('ch-tracks').innerHTML=CH_TRACKS.map(d=>{
+    const tot=chCodes(d).length,c=chCleared(d);
+    return `<button class="ch-track${d===sel?' sel':''}${tot&&c>=tot?' done':''}" data-track="${d}" style="--tc:${CH_COLORS[d]}">${chTrackName(d)}<small>${c}/${tot}</small></button>`;
+  }).join('');
+  const rk=rankFor(sum.stars),nx=RANKS[rk.idx+1];
+  $('ch-rank').textContent=`${rk.ic} ${t(rk.k)}`;
+  $('ch-stars-total').textContent=nx
+    ?tf('chRankNext',{s:sum.stars,ic:nx.ic,name:t(nx.k),need:nx.min})
+    :tf('chRankMax',{s:sum.stars});
+  const tot=chCodes(sel).length,cl=chCleared(sel),ts=chTrackStars(sel);
+  $('ch-prog-bar').style.width=(tot?cl/tot*100:0)+'%';
+  $('ch-prog-bar').style.background=`linear-gradient(90deg,${CH_COLORS[sel]},#e0a000)`;
+  $('ch-prog-txt').textContent=tf('chProgFmt',{c:cl,t:tot,s:ts,m:tot*3,
+    ch:Math.min(Math.ceil(tot/CH_BOSS_EVERY),Math.floor(cl/CH_BOSS_EVERY)+1),chs:Math.ceil(tot/CH_BOSS_EVERY)});
+  const go=$('ch-go');
+  if(!tot){go.textContent='—';go.disabled=true;}
+  else{
+    go.disabled=false;
+    go.textContent=cl>=tot?t('chDoneAll'):cl===0?t('chStart'):tf('chContinue',{n:cl+1})+(chIsBoss(cl+1)?' 👑':'');
+  }
+  $('ch-map-btn').textContent=t('chLevels');
+  renderChMap();
+}
+function renderChMap(){
+  const m=$('ch-map');if(!m||m.style.display==='none')return;
+  const d=CH_TRACKS.includes(SAVE.prefs.chTrack)?SAVE.prefs.chTrack:'easy';
+  const codes=chCodes(d),lv=chTrack(d).lv,un=chUnlocked(d);
+  let h='';
+  for(let i=1;i<=codes.length;i++){
+    const rec=lv[i],boss=chIsBoss(i),n=codes[i-1][0]==='a'?10:+codes[i-1][0];
+    const cls=['ch-lv'];
+    if(boss)cls.push('boss');
+    if(rec)cls.push('cleared');
+    if(i===un&&!rec)cls.push('next');
+    if(i>un)cls.push('locked');
+    if(chMode&&chMode.diff===d&&chMode.level===i)cls.push('cur');
+    const st=rec?'★'.repeat(rec.s)+'☆'.repeat(3-rec.s):'';
+    const tip=`${boss?'👑 ':''}${tf('chLvTip',{lv:i,n})}${rec?` · ${st} · ${fmtTime(rec.t)}`:''}`;
+    h+=`<button class="${cls.join(' ')}" data-lv="${i}" title="${tip}"${i>un?' disabled':''}>${i}<span class="lv-st">${st}</span></button>`;
+  }
+  m.innerHTML=h;
+}
+function toggleChMap(force){
+  const m=$('ch-map');
+  const show=force!==undefined?force:m.style.display==='none';
+  m.style.display=show?'':'none';
+  if(show)renderChMap();
+}
+function updateChHud(){
+  const hud=$('ch-hud');if(!hud)return;
+  if(!chMode||editMode){hud.style.display='none';hud.innerHTML='';return;}
+  const {diff,level}=chMode,boss=chIsBoss(level);
+  const par=chPar(diff,N,boss),rec=chTrack(diff).lv[level];
+  const tot=chCodes(diff).length,un=chUnlocked(diff);
+  const best=rec?`${'★'.repeat(rec.s)}${'☆'.repeat(3-rec.s)} ${fmtTime(rec.t)}`:'—';
+  hud.innerHTML=
+    (boss?`<span class="hud-boss">${t('hudBoss')}</span>`:'')+
+    `<span>${t('hudPar')} <b>${fmtTime(par)}</b></span>`+
+    `<span>${t('hudHints')} <b>${assist.hints}</b></span>`+
+    `<span>${t('hudBest')} <b>${best}</b></span>`+
+    (assist.sol?`<span style="color:var(--err)">${t('hudSol')}</span>`:'')+
+    `<span class="hud-nav"><button type="button" data-nav="-1"${level<=1?' disabled':''}>${t('hudPrev')}</button>`+
+    `<button type="button" data-nav="1"${level>=tot||level+1>un?' disabled':''}>${t('hudNext')}</button></span>`;
+  hud.style.display='flex';
+}
+
+// ── Winning ───────────────────────────────────────────────────────────
+function recordChallengeWin(){
+  const {diff,level}=chMode,boss=chIsBoss(level);
+  const sec=timerSeconds,par=chPar(diff,N,boss);
+  const stars=chStars(sec,par,assist);
+  const tr=chTrack(diff),prev=tr.lv[level]||null;
+  const clearedBefore=chCleared(diff);
+  const timeOK=!assist.sol;
+  const newBestTime=!!(prev&&timeOK&&(prev.t==null||sec<prev.t));
+  tr.lv[level]={s:Math.max(stars,prev?prev.s:0),t:timeOK&&(!prev||prev.t==null||sec<prev.t)?sec:(prev?prev.t:null)};
+  if(timeOK&&sec*2<=par)SAVE.stats.speed=(SAVE.stats.speed||0)+1;
+  if(timeOK&&assist.hints===0&&['intensive','advanced','master'].includes(diff))SAVE.stats.pure=(SAVE.stats.pure||0)+1;
+  const tot=chCodes(diff).length,clearedAfter=chCleared(diff);
+  const next=level<tot?level+1:null;
+  SAVE.prefs.lastCh=next?{diff,level:next}:{diff,level};
+  // Did this clear perfect its chapter?
+  const c0=Math.floor((level-1)/CH_BOSS_EVERY)*CH_BOSS_EVERY+1;
+  let chapterPerfect=stars===3&&(!prev||prev.s<3);
+  for(let i=c0;i<c0+CH_BOSS_EVERY&&chapterPerfect;i++)if(!tr.lv[i]||tr.lv[i].s!==3)chapterPerfect=false;
+  return{diff,level,boss,stars,sec,par,prev,firstClear:!prev,newBestStars:!!(prev&&stars>prev.s),newBestTime,
+    next,unlocked:clearedAfter>clearedBefore&&next&&next<=chUnlocked(diff)?next:null,
+    trackDone:clearedBefore<tot&&clearedAfter>=tot,chapter:chapterPerfect?Math.ceil(level/CH_BOSS_EVERY):0,
+    sol:assist.sol,hints:assist.hints};
+}
+function recordFreePB(){
+  if(curMeta.kind!=='gen')return null;
+  const key=`${N}-${curMeta.diff}`,prev=SAVE.pb[key],sec=timerSeconds;
+  if(prev==null||sec<prev){SAVE.pb[key]=sec;return{first:prev==null,prev,sec,n:N,d:curMeta.diff};}
+  return null;
+}
+function checkAchievements(){
+  const s=progressSummary(),fresh=[];
+  for(const a of ACH){if(!SAVE.ach[a.id]&&a.test(s)){SAVE.ach[a.id]=Date.now();fresh.push(a);}}
+  return fresh;
+}
+// Called once by checkWin() the moment a board is solved.
+function onSolved(){
+  const valid=!assist.recorded;
+  assist.recorded=true;
+  const w={ch:null,pb:null,ach:[],rankUp:null};
+  if(valid){
+    const before=rankFor(progressSummary().stars);
+    if(!assist.sol){SAVE.stats.wins=(SAVE.stats.wins||0)+1;bumpDaily();}
+    if(chMode)w.ch=recordChallengeWin();
+    else if(!assist.sol)w.pb=recordFreePB();
+    w.ach=checkAchievements();
+    const after=rankFor(progressSummary().stars);
+    if(after.idx>before.idx)w.rankUp=after;
+  }else if(chMode){
+    // Re-solve of an already-recorded board (e.g. Apply Solution after winning)
+    w.ch={diff:chMode.diff,level:chMode.level,boss:chIsBoss(chMode.level),stars:1,sec:timerSeconds,
+      par:chPar(chMode.diff,N,chIsBoss(chMode.level)),replay:true,next:chMode.level<chCodes(chMode.diff).length?chMode.level+1:null,sol:true,hints:assist.hints};
+  }
+  SAVE.resume=null;persist();
+  renderWinCard(w,true);
+  renderChPanel();updateChHud();
+  if(valid){
+    setTimeout(()=>launchConfetti(w.ch&&w.ch.boss?'boss':(w.ch&&w.ch.stars===3)||w.pb?'big':'normal'),330);
+    w.ach.forEach((a,i)=>setTimeout(()=>showToast(a.ic,t('achKicker'),t('achN_'+a.id),t('achD_'+a.id)),900+i*1100));
+  }
+}
+function renderWinCard(w,animate){
+  lastWin=w;
+  const card=document.querySelector('.win-card'),ch=w.ch;
+  card.classList.toggle('ch-win',!!ch);
+  card.classList.toggle('boss-win',!!(ch&&ch.boss));
+  $('win-title').textContent=ch?(ch.boss?t('chBossWin'):t('chLevelClear')):t('winTitle');
+  $('win-ch').style.display=ch?'':'none';
+  $('win-btns-ch').style.display=ch?'':'none';
+  $('win-btns-free').style.display=ch?'none':'';
+  $('win-msg').style.display=ch?'none':'';
+  const pills=[];
+  if(ch){
+    const tot=chCodes(ch.diff).length;
+    $('win-ch-level').textContent=tf('chWinLevel',{track:chTrackName(ch.diff),lv:ch.level,tot});
+    let info=tf('chWinInfo',{time:fmtTime(ch.sec),par:fmtTime(ch.par),h:ch.hints||0});
+    const tags=[];
+    if(ch.firstClear)tags.push(t('chFirstClear'));
+    if(ch.newBestStars||ch.newBestTime)tags.push(`<span class="nb">${t('chNewBest')}</span>`);
+    if(tags.length)info+='<br>'+tags.join(' · ');
+    if(ch.sol)info+='<br>'+t('chSolNote');
+    $('win-ch-info').innerHTML=info;
+    const spans=$('win-stars').children;
+    for(let i=0;i<3;i++){
+      const on=i<ch.stars;spans[i].className='';
+      if(animate)setTimeout(()=>{spans[i].className=on?'on':'off';},520+i*320);
+      else spans[i].className=on?'on':'off';
+    }
+    $('win-ch-next').textContent=ch.next?t('chNext')+(chIsBoss(ch.next)?' 👑':''):t('chTrackDoneBtn');
+    $('win-ch-next').disabled=!!(ch.next&&ch.next>chUnlocked(ch.diff));
+    $('win-ch-retry').textContent=t('chRetry');$('win-ch-map').textContent=t('chMap');
+    if(ch.trackDone)pills.push(`<div class="win-pill rank">${tf('chTrackDone',{t:tot})}</div>`);
+    if(ch.chapter)pills.push(`<div class="win-pill">${tf('chChapterPerfect',{c:ch.chapter})}</div>`);
+    if(ch.unlocked)pills.push(`<div class="win-pill">${tf('chUnlocked',{n:ch.unlocked})}${chIsBoss(ch.unlocked)?' · 👑 '+t('chBossKicker'):''}</div>`);
+  }else if(w.pb){
+    pills.push(`<div class="win-pill">${w.pb.first
+      ?tf('pbFirst',{n:w.pb.n,d:w.pb.d,time:fmtTime(w.pb.sec)})
+      :tf('pbNew',{n:w.pb.n,d:w.pb.d,prev:fmtTime(w.pb.prev)})}</div>`);
+  }
+  if(w.rankUp)pills.push(`<div class="win-pill rank">${tf('chRankUp',{ic:w.rankUp.ic,name:t(w.rankUp.k)})}</div>`);
+  if(w.ach.length)pills.push(`<div class="win-pill">${w.ach.map(a=>a.ic).join(' ')} ${t('achKicker')}: <b>${w.ach.map(a=>t('achN_'+a.id)).join(', ')}</b></div>`);
+  $('win-extra').innerHTML=pills.join('');
+}
+
+// ── Effects: confetti + toasts ────────────────────────────────────────
+let _fxRun=0;
+function launchConfetti(kind){
+  try{
+    if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+    const cv=$('fx-canvas');const ctx=cv&&cv.getContext&&cv.getContext('2d');if(!ctx)return;
+    const run=++_fxRun;
+    const W=window.innerWidth,H=window.innerHeight,dpr=Math.min(2,window.devicePixelRatio||1);
+    cv.width=W*dpr;cv.height=H*dpr;cv.style.display='block';ctx.setTransform(dpr,0,0,dpr,0,0);
+    const gold=['#f0b000','#ffd860','#e08000','#fff3c0','#c89000'];
+    const cols=kind==='boss'?gold:RC.map(c=>c.fill).concat(gold.slice(0,2));
+    const count=kind==='boss'?240:kind==='big'?170:110,parts=[];
+    for(let i=0;i<count;i++){
+      const left=i%2===0;
+      parts.push({x:left?-8:W+8,y:H*(.62+Math.random()*.2),vx:(left?1:-1)*(5+Math.random()*10),vy:-(10+Math.random()*13),
+        g:.3+Math.random()*.12,w:6+Math.random()*6,h:4+Math.random()*5,rot:Math.random()*6.28,vr:(Math.random()-.5)*.4,
+        c:cols[i%cols.length],shape:(kind!=='normal'&&i%5===0)?'star':(i%3===0?'dot':'rect')});
+    }
+    const t0=performance.now(),dur=kind==='boss'?4300:3000;
+    const frame=now=>{
+      if(run!==_fxRun)return;
+      const el=now-t0;ctx.clearRect(0,0,W,H);
+      const alpha=Math.max(0,Math.min(1,(dur-el)/700));
+      for(const p of parts){
+        p.vy+=p.g;p.vx*=.985;p.vy*=.988;p.x+=p.vx;p.y+=p.vy;p.rot+=p.vr;
+        ctx.save();ctx.globalAlpha=alpha;ctx.translate(p.x,p.y);ctx.rotate(p.rot);ctx.fillStyle=p.c;
+        if(p.shape==='dot'){ctx.beginPath();ctx.arc(0,0,p.w/2.3,0,6.283);ctx.fill();}
+        else if(p.shape==='star'){
+          ctx.beginPath();
+          for(let k=0;k<10;k++){const rr=k%2?p.w*.42:p.w;const a=k*Math.PI/5-Math.PI/2;ctx.lineTo(Math.cos(a)*rr,Math.sin(a)*rr);}
+          ctx.closePath();ctx.fill();
+        }
+        else ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h);
+        ctx.restore();
+      }
+      if(el<dur)requestAnimationFrame(frame);
+      else{ctx.clearRect(0,0,W,H);cv.style.display='none';}
+    };
+    requestAnimationFrame(frame);
+  }catch(e){console.warn('confetti failed',e);}
+}
+function showToast(ic,kicker,name,desc,ms=3800){
+  const w=$('toast-wrap');if(!w)return;
+  const el=document.createElement('div');el.className='toast';
+  el.innerHTML=`<span class="t-ic">${ic}</span><span class="t-tx"><span class="t-k">${kicker}</span><span class="t-n">${name}</span>${desc?`<span class="t-d">${desc}</span>`:''}</span>`;
+  w.appendChild(el);
+  while(w.children.length>3)w.firstChild.remove();
+  setTimeout(()=>{el.classList.add('out');setTimeout(()=>el.remove(),400);},ms);
+}
+
+// ── Trophy / stats modal ──────────────────────────────────────────────
+function renderAchModal(){
+  const s=progressSummary(),got=ACH.filter(a=>SAVE.ach[a.id]).length;
+  $('ach-title').textContent=t('achTitle');
+  const stat=(v,k)=>`<div class="ach-stat"><b>${v}</b><span>${t(k)}</span></div>`;
+  $('ach-stats').innerHTML=stat(s.wins,'stWins')+stat(s.stars,'stStars')+stat(s.bosses,'stBosses')+
+    stat(s.perfect,'stPerfect')+stat(Math.max(s.bestStreak,liveStreak()),'stStreak')+stat(`${got}/${ACH.length}`,'stTrophies');
+  $('ach-list').innerHTML=ACH.map(a=>{
+    const on=!!SAVE.ach[a.id];
+    return `<div class="ach-item ${on?'got':'locked'}"><span class="a-ic">${a.ic}</span><span><div class="a-n">${t('achN_'+a.id)}</div><div class="a-d">${t('achD_'+a.id)}</div></span></div>`;
+  }).join('')+(storageOK?'':`<div class="a-d" style="grid-column:1/-1;color:var(--err)">${t('storageOff')}</div>`);
+  $('ach-reset').textContent=t('achReset');
+}
+function openAchModal(){renderAchModal();$('ach-modal').style.display='flex';}
+function closeAchModal(){$('ach-modal').style.display='none';}
+
+// ── Resume: snapshot the board so a reload continues where you left off ──
+let _resumeTimer=null;
+function scheduleResumeSave(){clearTimeout(_resumeTimer);_resumeTimer=setTimeout(saveResume,500);}
+function saveResume(){
+  try{
+    if(editMode||!regions.length||$('board-wrapper').style.display==='none')return;
+    if(solved){if(SAVE.resume){SAVE.resume=null;persist();}return;}
+    SAVE.resume={n:N,r:Array.from(regions),s:Array.from(solution),cs:Array.from(cellState),
+      mv:moves,tm:timerSeconds,ax:autoXOn,meta:curMeta,ch:chMode,as:assist};
+    persist();
+  }catch(e){}
+}
+function restoreResume(){
+  const R=SAVE.resume;
+  if(!R||!(R.n>=4&&R.n<=12))return false;
+  const n=R.n;
+  if(!Array.isArray(R.r)||R.r.length!==n*n||!Array.isArray(R.s)||R.s.length!==n)return false;
+  if(R.r.some(v=>!(v>=0&&v<n))||R.s.some(v=>!(v>=0&&v<n)))return false;
+  const meta=R.meta||{kind:'gen',diff:'medium'};
+  loadFixedPuzzle({n,regions:R.r,solution:R.s,diff:meta.diff||'medium',kind:meta.kind||'gen'});
+  if(R.ch&&CH_TRACKS.includes(R.ch.diff)&&R.ch.level>=1&&R.ch.level<=chCodes(R.ch.diff).length)chMode={diff:R.ch.diff,level:R.ch.level};
+  if(Array.isArray(R.cs)&&R.cs.length===N*N){
+    cellState=R.cs.map(v=>(v===1||v===2||v===3)?v:0);
+    for(let r=0;r<N;r++)for(let c=0;c<N;c++)setCellDOM(r,c,cellState[r*N+c]);
+  }
+  autoXOn=!!R.ax;$('btn-auto-x').classList.toggle('on',autoXOn);
+  moves=R.mv|0;timerSeconds=R.tm|0;updateTimerDisplay();
+  if(R.as)assist={hints:R.as.hints|0,sol:!!R.as.sol,recorded:false};
+  updateStats(false);scheduleConflictUpdate();
+  refreshBoardTitle();updateChHud();renderChPanel();
+  return true;
+}
+
+// ── Theme preference: a specific theme, or "Random (current)" ──────────
+const THEME_KEYS={light1:'thDaylight',light2:'thSeafoam',light3:'thBlossom',dark1:'thMidnight',dark2:'thAbyss',dark3:'thAubergine'};
+function themeLabel(id){return t(THEME_KEYS[id]||'thDaylight').replace(/^\S+\s+/,'');}
+function updateRandomThemeLabel(){
+  const o=$('theme-opt-random');if(!o)return;
+  const zh=curLang==='zh';
+  o.textContent=`${t('thRandom')}${zh?'（':' ('}${themeLabel(currentTheme)}${zh?'）':')'}`;
+}
+// Re-localize everything this module renders (called at the end of applyLang)
+function chAfterLang(){
+  updateRandomThemeLabel();refreshBoardTitle();renderChPanel();updateChHud();
+  if(lastWin&&$('win-banner').classList.contains('show'))renderWinCard(lastWin,false);
+  if($('ach-modal').style.display!=='none')renderAchModal();
+}
+
+// ── Event bindings ────────────────────────────────────────────────────
+$('ch-tracks').addEventListener('click',e=>{
+  const b=e.target.closest('[data-track]');if(!b)return;
+  SAVE.prefs.chTrack=b.dataset.track;persist();renderChPanel();
+});
+$('ch-go').addEventListener('click',()=>{
+  const d=CH_TRACKS.includes(SAVE.prefs.chTrack)?SAVE.prefs.chTrack:'easy';
+  const tot=chCodes(d).length,c=chCleared(d);
+  if(c>=tot){toggleChMap(true);return;}
+  loadChallengeLevel(d,c+1);
+});
+$('ch-map-btn').addEventListener('click',()=>toggleChMap());
+$('ch-map').addEventListener('click',e=>{
+  const b=e.target.closest('[data-lv]');if(!b||b.disabled)return;
+  loadChallengeLevel(SAVE.prefs.chTrack,+b.dataset.lv);
+});
+$('ch-hud').addEventListener('click',e=>{
+  const b=e.target.closest('[data-nav]');if(!b||b.disabled||!chMode)return;
+  loadChallengeLevel(chMode.diff,chMode.level+(+b.dataset.nav));
+});
+$('ch-trophy-btn').addEventListener('click',openAchModal);
+$('ach-close').addEventListener('click',closeAchModal);
+$('ach-modal').addEventListener('click',e=>{if(e.target===$('ach-modal'))closeAchModal();});
+$('ach-reset').addEventListener('click',()=>{
+  if(!window.confirm(t('achResetConfirm')))return;
+  const prefs=SAVE.prefs,resume=SAVE.resume;
+  SAVE=defaultSave();SAVE.prefs={...prefs,lastCh:null};SAVE.resume=resume&&!resume.ch?resume:null;
+  if(chMode){chMode=null;refreshBoardTitle();}
+  persist();renderAchModal();renderChPanel();updateChHud();
+});
+$('win-ch-next').addEventListener('click',()=>{
+  const w=lastWin&&lastWin.ch;if(!w)return;
+  if(w.next){loadChallengeLevel(w.diff,w.next);}
+  else{$('win-banner').classList.remove('show');toggleChMap(true);$('ch-panel').scrollIntoView({behavior:'smooth',block:'nearest'});}
+});
+$('win-ch-retry').addEventListener('click',()=>{const w=lastWin&&lastWin.ch;if(w)loadChallengeLevel(w.diff,w.level);});
+$('win-ch-map').addEventListener('click',()=>{
+  $('win-banner').classList.remove('show');toggleChMap(true);
+  $('ch-panel').scrollIntoView({behavior:'smooth',block:'nearest'});
+});
+window.addEventListener('pagehide',saveResume);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)saveResume();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('ach-modal').style.display!=='none')closeAchModal();});
+
 // Robust startup: never let a single failure leave a blank / "loading error"
 // screen. Each init step is guarded independently; if the first puzzle fails to
 // generate for any reason, fall back to an easy board so the page is usable.
 (function bootstrap(){
-  try{ applyLang('en'); }catch(e){ console.warn('applyLang failed',e); }
-  try{ applyAutoTheme(); }catch(e){ console.warn('applyAutoTheme failed',e); }
-  try{ showThemeName(); }catch(e){ console.warn('showThemeName failed',e); }
+  try{ loadSave(); }catch(e){ console.warn('loadSave failed',e); }
   try{
-    initPuzzle(8,'intensive',0);
+    let lang=SAVE.prefs.lang;
+    if(lang!=='en'&&lang!=='zh')lang=/^zh/i.test(navigator.language||'')?'zh':'en';
+    $('lang-select').value=lang;applyLang(lang);
+  }catch(e){ console.warn('applyLang failed',e); }
+  try{
+    themePref=SAVE.prefs.theme;
+    if(themePref!=='random'&&THEMES[themePref])setTheme(themePref);
+    else{themePref='random';applyAutoTheme();}
+  }catch(e){ console.warn('theme init failed',e); }
+  try{ showThemeName(); }catch(e){ console.warn('showThemeName failed',e); }
+  try{ $('about-ver').textContent='Version '+APP_VERSION;renderChPanel(); }catch(e){ console.warn('challenge panel failed',e); }
+  // 1) resume the board that was open last time, 2) else the saved challenge
+  // level, 3) else generate a fresh board with the last free-play settings.
+  let started=false;
+  try{ started=restoreResume(); }catch(e){ console.warn('resume failed',e);started=false; }
+  if(!started){
+    try{
+      const lc=SAVE.prefs.lastCh;
+      if(lc&&CH_TRACKS.includes(lc.diff)&&lc.level>=1&&lc.level<=chUnlocked(lc.diff)){loadChallengeLevel(lc.diff,lc.level);started=true;}
+    }catch(e){ console.warn('challenge resume failed',e); }
+  }
+  if(started)return;
+  try{
+    const n=[5,6,7,8,9,10,11,12].includes(+SAVE.prefs.size)?+SAVE.prefs.size:8;
+    const d=['easy','medium','hard','intensive','advanced','master'].includes(SAVE.prefs.diff)?SAVE.prefs.diff:'intensive';
+    $('size-select').value=n;$('diff-select').value=d;
+    initPuzzle(n,d,0);
   }catch(e){
     console.error('initPuzzle failed, falling back to easy',e);
     try{ initPuzzle(8,'easy',0); }catch(e2){ console.error('fallback init failed',e2); }

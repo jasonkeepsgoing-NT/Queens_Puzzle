@@ -69,6 +69,20 @@ One date-seeded board family per day, identical for everyone: **Normal** (Hard c
 
 Every solve is logged (size, class, time, moves, hints and the tier of each hint, wrong queens placed, solution viewed). **Speed index** = 100 × expected ÷ actual time, where expected time comes from the board's own solution path (scan cost by size + a cost per deduction tier). The stats dialog shows tiles, a 30-solve speed trend, a per-difficulty table, a technique profile (Training accuracy, time to find, hint dependence) and rule-based **advice** — the technique that blocks you (with a one-click drill), wrong-queen habits, big-board slowdown, trend, readiness for the next difficulty. *The cost model is a heuristic, not yet fitted to player data.*
 
+## Solve review (order-independent)
+
+Every board change is logged as *(time, cell, new state, source)*. After a win the log is replayed, and each action is judged against **the board as it was at that moment** — never against the solver's order, so solving in any order is fine. The review flags:
+
+- **Wrong marks**: queens off the solution, and ✕ on a solution cell (the costliest mistake: it silently blocks later deductions), plus how long each stayed on the board.
+- **Pauses** (≥ 3× your own median gap, min 12 s), each explained by what was true right then: a wrong mark was blocking progress · an easy move (Tier 0/1) was waiting, with the cell · a genuinely hard step, with the technique (one-click drill).
+- **Redundant ✕** on cells already blocked by a queen (→ Auto Elimination) and **churn** (cells toggled 3+ times, excluding mistake fixes).
+
+The result is a play-quality score (A–D, 0–100), up to four concrete tips and a timeline; recent reviews also feed the advice in *My Stats*.
+
+## Web Worker generation
+
+Generation runs on a background thread of the player's own device (a Web Worker built at runtime from the page's pure engine block, `/*ENGINE_BEGIN*/ … /*ENGINE_END*/`). No server is involved. The page stays responsive during long generations (measured: Master 10×10, 26.5 s, ~58 fps on the main thread). Daily boards are built in the worker too and are byte-identical to the main-thread result. If workers are unavailable the old main-thread loop is used.
+
 ## Queen icons
 
 A dropdown next to the theme picker: **♛ Queen** (default), **✨ Theme** (follows the theme: ☀️ Sun · 🐚 Shell · 🌸 Flower · 🌙 Moon · 🪼 Jellyfish · 💎 Gem), any single icon, or **🎲 Random** (shown as `Random (current icon)`). Icons are SVG masks painted in the theme's queen colour, so they inherit each theme's palette.

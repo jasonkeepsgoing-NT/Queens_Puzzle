@@ -154,6 +154,26 @@ const solveNow=w=>ev(w,`for(let r=0;r<N;r++){cellState[r*N+solution[r]]=2;setCel
   ok(/Evaluation|评估/.test(w.document.getElementById('stats-body').textContent)&&w.document.querySelector('#stats-body svg.sv'),'stats modal renders advice + trend chart');
   ev(w,`closeStatsModal()`);
 
+  // ── 13. Solve review: order-independent move analysis ──
+  const rv=ev(w,`(()=>{loadChallengeLevel('medium',1);
+    const act=(i,st,tm)=>{timerSeconds=tm;cellState[i]=st;setCellDOM(i/N|0,i%N,st);moves++;updateStats(false);};
+    const q0=0*N+solution[0];
+    act(q0,1,4);                      // wrong ✕ on a solution cell
+    act(q0,0,45);                     // fixed after a long pause (stall caused by the wrong mark)
+    // place queens in REVERSE row order (not the solver's order) with short gaps
+    let tm=46;for(let r=N-1;r>=1;r--){act(r*N+solution[r],2,tm+=3);}
+    const rq=(N-1)*N+((solution[N-1]+2)%N);   // a cell in the last queen's row → blocked by it
+    if(cellState[rq]===0)act(rq,1,tm+=2);     // redundant ✕
+    const tc=1*N+((solution[1]+3)%N);
+    if(cellState[tc]===0){act(tc,1,tm+=1);act(tc,0,tm+=1);act(tc,1,tm+=1);act(tc,0,tm+=1);}  // churn
+    act(q0,2,tm+=60);                 // last queen after a 60 s pause (row 1 has one cell left → missed easy)
+    checkWin();const r=SAVE.lastReview;
+    return r&&{wx:r.wx,wq:r.wq,me:r.me,rx:r.rx,ch:r.ch,sc:r.sc,g:r.grade,items:r.items.map(x=>x.k).join(','),tips:r.tips.map(x=>x.k).join(',')};})()`);
+  ok(rv&&rv.wx===1&&rv.wq===0&&rv.me>=1&&rv.ch>=1&&/rvStallWrong/.test(rv.items),'solve review: wrong ✕, stall caused by it, missed easy move, churn detected — '+JSON.stringify(rv));
+  ev(w,`openReviewModal()`);
+  ok(/Key moments|关键时刻/.test(w.document.getElementById('review-body').textContent),'review modal renders');
+  ev(w,`closeReviewModal()`);
+
   // ── 12. Icons ──
   ev(w,`$('icon-select').value='theme';$('icon-select').dispatchEvent(new Event('change'))`);
   ok(ev(w,`$('board-grid').getAttribute('data-qicon')===THEME_QICON[currentTheme]`),'theme-matched icon applied: '+ev(w,`$('board-grid').getAttribute('data-qicon')`));

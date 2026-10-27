@@ -549,6 +549,10 @@ select:hover,select:focus{border-color:var(--accent);outline:none;}
 .win-ch-info .nb{color:var(--win);font-weight:700;}
 .win-extra{display:flex;flex-direction:column;gap:5px;width:100%;}
 .win-extra:empty{display:none;}
+.win-review{font-size:11px;padding:5px 12px;}
+.rv-tl{list-style:none;display:flex;flex-direction:column;gap:4px;max-height:260px;overflow-y:auto;}
+.rv-tl li{display:flex;gap:9px;font-size:11px;line-height:1.45;padding:5px 8px;border-radius:7px;background:var(--surface2);}
+.rv-t{font-family:'DM Mono',monospace;font-size:10px;color:var(--text2);min-width:34px;}
 .win-pill{font-family:'DM Mono',monospace;font-size:10px;line-height:1.4;padding:5px 9px;border-radius:8px;
   border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);background:color-mix(in srgb,var(--accent) 10%,var(--surface));
   color:var(--text);text-align:left;animation:fade-in .4s ease both;}
@@ -854,6 +858,7 @@ select:hover,select:focus{border-color:var(--accent);outline:none;}
         </div>
         <p id="win-msg"></p>
         <div class="win-extra" id="win-extra"></div>
+        <button class="btn-hint-inline win-review" id="win-review" style="display:none">🔍 Review</button>
         <div class="win-btns" id="win-btns-ch" style="display:none">
           <button class="btn-generate" id="win-ch-next">Next Level ▶</button>
           <button class="btn-hint-inline" id="win-ch-retry">↺ Retry</button>
@@ -927,6 +932,12 @@ select:hover,select:focus{border-color:var(--accent);outline:none;}
     <div class="modal-card st-card">
       <div class="modal-head"><span id="stats-title">📊 My Stats</span><button class="win-overlay-close" id="stats-close" aria-label="Close">&times;</button></div>
       <div id="stats-body"></div>
+    </div>
+  </div>
+  <div id="review-modal" class="modal-back" style="display:none">
+    <div class="modal-card st-card">
+      <div class="modal-head"><span id="review-title">🔍 Solve review</span><button class="win-overlay-close" id="review-close" aria-label="Close">&times;</button></div>
+      <div id="review-body"></div>
     </div>
   </div>
   <div id="toast-wrap" class="toast-wrap" aria-live="polite"></div>
@@ -1147,6 +1158,7 @@ function inB(r,c,n){return r>=0&&r<n&&c>=0&&c<n;}
 
 // ── Timer functions are defined later (near the edit-mode block) ──────
 
+/*ENGINE_BEGIN*/ // ↓ pure engine (no DOM): also shipped verbatim into the generation Web Worker
 // ═══════════════════════════════════════════════════════════════════════
 // SOLVERS
 // ═══════════════════════════════════════════════════════════════════════
@@ -2554,6 +2566,7 @@ function generatePuzzleSync(n,difficulty,maxSingles=0){
   return null;
 }
 
+/*ENGINE_END*/
 // ═══════════════════════════════════════════════════════════════════════
 // PROGRESS + ASYNC GEN LOOP
 // ═══════════════════════════════════════════════════════════════════════
@@ -2625,6 +2638,7 @@ function runGenLoop(n,diff,maxSingles,attempt){
 function initPuzzle(n,diff,maxSingles){
   if(maxSingles===undefined)maxSingles=parseInt($('single-select').value)||0;
   chExit();
+  cancelGeneration();
   SAVE.prefs.size=n;if(diff!=='custom')SAVE.prefs.diff=diff;persist();
   genAborted=true;
   setTimeout(()=>{
@@ -2646,7 +2660,7 @@ function initPuzzle(n,diff,maxSingles){
     clearHintFx();
     clearTimeout(conflictTimer);clearTimeout(hintClearTimer);
     startProgress();setGenStatus('Building puzzle…');setGenAttempts('');
-    runGenLoop(n,diff,maxSingles,0);
+    startGeneration(n,diff,maxSingles);
   },10);
 }
 function onPuzzleReady(n,diff,result){
@@ -2797,6 +2811,7 @@ function doApplyStep(){
   // Turn on Auto-X when applying step 1
   if(applyStepIdx===0&&!autoXOn){autoXOn=true;$('btn-auto-x').classList.add('on');}
   const step=solutionSteps[applyStepIdx];
+  _actSrc='s';
   saveUndoSnapshot();
   if(step.type==='queen'){
     // Per spec: upgrade auto-X srcCells to manual X, then place queen
@@ -3096,6 +3111,7 @@ function undoLastAction(){
   if(undoStack.length===0)return;
   if(solved){solved=false;$('win-banner').classList.remove('show');}
   const{snapshot,moves:m}=undoStack.pop();
+  _actSrc='z';
   cellState=Array.from(snapshot);moves=m;
   for(let r=0;r<N;r++)for(let c=0;c<N;c++)setCellDOM(r,c,cellState[r*N+c]);
   clearHintDisplay();updateStats(false);scheduleConflictUpdate();
@@ -3345,6 +3361,7 @@ function clearHintDisplay(){
 
 function applyHint(){
   if(!activeHint||solved)return;
+  _actSrc='h';
   const hint=activeHint;clearHintDisplay();
   if(hint.type==='wrong-queen-reveal'){
     saveUndoSnapshot();cellState[hint.row*N+hint.col]=0;setCellDOM(hint.row,hint.col,0);refreshAutoX();
@@ -3487,6 +3504,7 @@ function updateStats(alsoConflicts=true){
   $('stat-placed').textContent=placed;$('stat-placed').className='stat-value'+(placed>N?' bad':placed>0?' good':'');
   $('stat-needed').textContent=N;$('stat-moves').textContent=moves;
   if(alsoConflicts)updateConflictHighlights();
+  if(typeof trackActions==='function')trackActions();
   if(typeof trackMistakes==='function')trackMistakes();
   if(typeof scheduleResumeSave==='function')scheduleResumeSave();
 }
@@ -3568,6 +3586,7 @@ function checkWin(){
 
 function restartBoard(){
   const wasSolved=solved,savedMoves=moves;
+  _actSrc='r';
   clearAutoX();cellState=new Array(N*N).fill(0);
   moves=wasSolved?0:savedMoves;solved=false;undoStack.length=0;applyStepIdx=0;
   hintTier=-1;hintPool=[];hintIdx=0;activeHint=null;lastTapCell=null;
@@ -3692,7 +3711,7 @@ function enterEditMode(){
   if(editMode)return;
   chExit();
   editMode=true;
-  genAborted=true;
+  cancelGeneration();
   stopTimer();
   editN=parseInt($('size-select').value)||8;
   editBrush=0;
@@ -4144,6 +4163,31 @@ const I18N={
     // queen icons
     icQueen:'♛ Queen',icTheme:'✨ Theme',icRandom:'🎲 Random',
     ic_sun:'Sun',ic_shell:'Shell',ic_flower:'Flower',ic_moon:'Moon',ic_jelly:'Jellyfish',ic_gem:'Gem',
+    // solve review
+    winReview:'🔍 Review',rvPill:'🔍 Play quality {g} · {s}/100 — open Review for move-by-move tips',
+    rvTitle:'🔍 Solve review',rvNone:'Solve a puzzle to get a move-by-move review.',
+    rvScore:'Play quality',rvMistakes:'Wrong marks',rvMissed:'Missed easy moves',rvRedundant:'Redundant ✕',rvChurn:'Toggled cells',
+    rvTipsTitle:'What would have saved you time',rvTimeline:'Key moments',rvNoEvents:'No mistakes, no long pauses — a clean solve.',
+    rvNote:'Your order of play is never judged against the solver\'s order. Each action is checked against the board as it was at that moment; each long pause (≥ 3× your usual gap, min 12 s) is checked against what was provable right then. Score = 100 − 8/wrong queen − 6/wrong ✕ − 4/missed easy move − 2/toggled cell − redundant ✕ (max −10).',
+    rvWrongQWord:'wrong queen',rvWrongXWord:'wrong ✕',
+    rvStallWrong:'Paused {d} — your board held a {what} at {c} (placed at {at}), so nothing could be proved.',
+    rvStallEasy:'Paused {d} while an easy move was available: <b>{name}</b> at {c}.',
+    rvStallHard:'Paused {d} — the next step needed <b>{name}</b> ({c}). A genuinely hard spot.',
+    rvWrongQ:'Placed a queen at {c} that is not in the solution.',rvWrongX:'Marked ✕ on {c}, which holds a queen in the solution.',
+    rvFixed:'Fixed {c} after {d}.',
+    rvTipWrongX:'A ✕ on a queen\'s cell ({c}) is the most expensive mistake: it silently blocks every later deduction. You carried wrong marks for {d} in total. Mark ✕ only when a rule proves it.',
+    rvTipWrongQ:'{n} wrong queen(s). Place a queen only when a region, row or column has a single cell left — or after a Killer check.',
+    rvTipEasy:'{n} time(s) you paused while an easy move was waiting (e.g. <b>{name}</b> at {c}). After every queen or ✕, re-scan the row, column and region it touched.',
+    rvTipHard:'Your longest real thinking spot ({d}) needed <b>{name}</b>. A few drills make it faster to spot.',
+    rvTipRedundant:'{n} of your ✕ were on cells already blocked by a queen. Auto Elimination draws those for free — save your clicks for real deductions.',
+    rvTipChurn:'{n} cell(s) were toggled 3+ times. Decide what a cell is before clicking; when unsure, leave it empty.',
+    rvTipLeaps:'You placed {n} queens straight from reasoning without marking first, and never went wrong — strong visualisation.',
+    rvTipClean:'Clean solve: no wrong marks and no missed easy moves.',
+    advScan:'You average {n} missed easy move(s) per solve: something simple was available while you paused. Build a scan routine: after each move, check its row, column and region.',
+    advWrongX:'Wrong ✕ marks ({n}/solve) are costing you the most time — they block later deductions without you noticing.',
+    advAutoX:'About {n} of your ✕ per solve are on cells already blocked by queens. Turn on Auto Elimination.',
+    advChurn:'You toggle about {n} cells back and forth per solve. Slow down the click, speed up the thinking.',
+    stDailyStreak:'Daily streak',stQuality:'Play quality',stLastReview:'🔍 Last solve review',
     aboutNote:'This game was inspired by LinkedIn\'s daily puzzle games. Its rules are the same as LinkedIn\'s Queens.',
     boardTitleSeeded:'{n}×{n} Queens Puzzle (Seeded)',boardTitleCustom:'{n}×{n} Custom Queens Puzzle',
     storageOff:'Progress can\'t be saved in this browser (storage is blocked).',
@@ -4320,6 +4364,30 @@ const I18N={
     advSteady:'稳定扎实。保持节奏，觉得轻松时就挑战下一个难度。',
     icQueen:'♛ 皇后',icTheme:'✨ 主题',icRandom:'🎲 随机',
     ic_sun:'太阳',ic_shell:'贝壳',ic_flower:'花朵',ic_moon:'月亮',ic_jelly:'水母',ic_gem:'宝石',
+    winReview:'🔍 复盘',rvPill:'🔍 操作质量 {g} · {s}/100 —— 打开复盘查看逐步建议',
+    rvTitle:'🔍 解题复盘',rvNone:'解出一题后即可看到逐步复盘。',
+    rvScore:'操作质量',rvMistakes:'错误标记',rvMissed:'错过的简单步',rvRedundant:'多余 ✕',rvChurn:'反复改动的格子',
+    rvTipsTitle:'哪些地方能帮你省时间',rvTimeline:'关键时刻',rvNoEvents:'没有错误、没有长时间停顿——非常干净的一局。',
+    rvNote:'不会拿你的操作顺序去和求解器的顺序比较。每一步都按当时的棋盘来判断；每次较长停顿（≥ 平时间隔的 3 倍，至少 12 秒）都检查当时能证明什么。分数 = 100 − 8×错皇后 − 6×错 ✕ − 4×错过的简单步 − 2×反复改动的格子 − 多余 ✕（最多扣 10）。',
+    rvWrongQWord:'错误的皇后',rvWrongXWord:'错误的 ✕',
+    rvStallWrong:'停顿 {d} ——棋盘上 {c} 有一个{what}（{at} 放下），所以什么都推不出来。',
+    rvStallEasy:'停顿 {d}，而此时有一步简单推理可用：<b>{name}</b>，位置 {c}。',
+    rvStallHard:'停顿 {d} ——下一步需要 <b>{name}</b>（{c}），确实是难点。',
+    rvWrongQ:'在 {c} 放了一个不属于正确解的皇后。',rvWrongX:'在 {c} 标了 ✕，但那里是正确解的皇后位置。',
+    rvFixed:'{d} 后改正了 {c}。',
+    rvTipWrongX:'把 ✕ 标在皇后位置（{c}）代价最大：它会悄悄挡住之后的每一步推理。这局错误标记总共留存了 {d}。只有规则能证明时才标 ✕。',
+    rvTipWrongQ:'放错了 {n} 个皇后。只在区域/行/列只剩一个格子、或做过封杀检查后才放皇后。',
+    rvTipEasy:'有 {n} 次你在停顿时其实有简单步可走（例如 <b>{name}</b>，{c}）。每放一个皇后或 ✕，都回扫它所在的行、列和区域。',
+    rvTipHard:'你最长的一次真正思考（{d}）需要 <b>{name}</b>。做几道专项练习能更快看出来。',
+    rvTipRedundant:'你有 {n} 个 ✕ 标在已经被皇后封锁的格子上。「自动消除」会免费画出这些——把点击留给真正的推理。',
+    rvTipChurn:'有 {n} 个格子被来回改了 3 次以上。点之前先想清楚；不确定就先空着。',
+    rvTipLeaps:'你有 {n} 个皇后是不标 ✕ 直接推理出来的，而且一个都没错——很强的盘面想象力。',
+    rvTipClean:'干净的一局：没有错误标记，也没有错过简单步。',
+    advScan:'平均每局有 {n} 次在停顿时错过了简单步。建立扫描习惯：每走一步，检查它所在的行、列和区域。',
+    advWrongX:'错误的 ✕（每局 {n} 个）最耗时间——它们会在你不察觉时挡住后续推理。',
+    advAutoX:'每局约有 {n} 个 ✕ 标在已被皇后封锁的格子上。打开「自动消除」吧。',
+    advChurn:'每局约有 {n} 个格子被来回改动。点击慢一点，思考快一点。',
+    stDailyStreak:'每日连续',stQuality:'操作质量',stLastReview:'🔍 上一局复盘',
     aboutNote:'本游戏受 LinkedIn（领英）每日益智游戏启发而制作，游戏规则与 LinkedIn 的 Queens 相同。',
     boardTitleSeeded:'{n}×{n} 皇后谜题（种子）',boardTitleCustom:'{n}×{n} 自定义皇后谜题',
     storageOff:'当前浏览器无法保存进度（本地存储被禁用）。',
@@ -4589,7 +4657,7 @@ $('diff-select').addEventListener('change',e=>{
 // stats, trophies, in-progress board). Every access is guarded: if storage is
 // blocked (private mode, sandboxed preview) the game runs from memory only.
 // ═══════════════════════════════════════════════════════════════════════
-const APP_VERSION='2026-10-27 04:47 UTC';
+const APP_VERSION='2026-10-27 19:12 UTC';
 const STORE_KEY='queensPuzzle.save.v1';
 let storageOK=true;
 function defaultSave(){
@@ -4745,7 +4813,7 @@ function liveStreak(){
   return(st.lastDay===today||st.lastDay===dayKey(y))?(st.streak||0):0;
 }
 
-function resetAssist(){assist={hints:0,sol:false,recorded:false,mis:0,ht:[]};_wrongPrev=new Set();}
+function resetAssist(){assist={hints:0,sol:false,recorded:false,mis:0,ht:[],al:[]};_wrongPrev=new Set();resetActionLog();}
 function noteAssist(kind){
   if(solved)return;
   if(kind==='hint')assist.hints++;
@@ -4771,7 +4839,7 @@ function refreshBoardTitle(){
 
 // Load a fully-specified board instantly (challenge level, seed, resumed game).
 function loadFixedPuzzle(p){
-  genAborted=true;                       // stop any generation still running
+  cancelGeneration();                    // stop any generation still running
   if(editMode)exitEditMode();
   chMode=null;trMode=null;dailyMode=null;
   stopTimer();
@@ -4938,6 +5006,8 @@ function onSolved(){
   if(valid){
     const before=rankFor(progressSummary().stars);
     if(!assist.sol){SAVE.stats.wins=(SAVE.stats.wins||0)+1;bumpDaily();}
+    try{SAVE.lastReview=analyzeSolveReview();}catch(e){console.warn('review failed',e);SAVE.lastReview=null;}
+    w.rv=SAVE.lastReview;
     logSolve();
     if(chMode)w.ch=recordChallengeWin();
     else if(dailyMode){
@@ -5003,10 +5073,12 @@ function renderWinCard(w,animate){
       ?tf('pbFirst',{n:w.pb.n,d:w.pb.d,time:fmtTime(w.pb.sec)})
       :tf('pbNew',{n:w.pb.n,d:w.pb.d,prev:fmtTime(w.pb.prev)})}</div>`);
   }
+  if(w.rv)pills.push(`<div class="win-pill">${tf('rvPill',{g:w.rv.grade,s:w.rv.sc})}</div>`);
   if(w.daily)pills.push(`<div class="win-pill">${tf('dailyDone',{v:t('daily_'+w.daily.v)})}${w.daily.left.length?' '+tf('dailyLeft',{l:w.daily.left.join(' / ')}):' '+t('dailyAllDone')}</div>`);
   if(w.rankUp)pills.push(`<div class="win-pill rank">${tf('chRankUp',{ic:w.rankUp.ic,name:t(w.rankUp.k)})}</div>`);
   if(w.ach.length)pills.push(`<div class="win-pill">${w.ach.map(a=>a.ic).join(' ')} ${t('achKicker')}: <b>${w.ach.map(a=>t('achN_'+a.id)).join(', ')}</b></div>`);
   $('win-extra').innerHTML=pills.join('');
+  $('win-review').style.display=w.rv?'':'none';$('win-review').textContent=t('winReview');
 }
 
 // ── Effects: confetti + toasts ────────────────────────────────────────
@@ -5103,8 +5175,9 @@ function restoreResume(){
   }
   autoXOn=!!R.ax;$('btn-auto-x').classList.toggle('on',autoXOn);
   moves=R.mv|0;timerSeconds=R.tm|0;updateTimerDisplay();
-  if(R.as)assist={hints:R.as.hints|0,sol:!!R.as.sol,recorded:false,mis:R.as.mis|0,ht:Array.isArray(R.as.ht)?R.as.ht.slice(0,20):[]};
-  _wrongPrev=wrongQueenSet();
+  if(R.as)assist={hints:R.as.hints|0,sol:!!R.as.sol,recorded:false,mis:R.as.mis|0,ht:Array.isArray(R.as.ht)?R.as.ht.slice(0,20):[],
+    al:Array.isArray(R.as.al)?R.as.al.slice(0,600):[]};
+  _wrongPrev=wrongQueenSet();resetActionLog();
   updateStats(false);scheduleConflictUpdate();
   refreshBoardTitle();updateChHud();renderChPanel();
   return true;
@@ -5122,6 +5195,7 @@ function updateRandomThemeLabel(){
 function chAfterLang(){
   updateRandomThemeLabel();refreshBoardTitle();renderChPanel();updateChHud();renderIconSelect();
   if($('stats-modal').style.display!=='none')renderStatsModal();
+  if($('review-modal').style.display!=='none')renderReviewModal();
   if(lastWin&&$('win-banner').classList.contains('show'))renderWinCard(lastWin,false);
   if($('ach-modal').style.display!=='none')renderAchModal();
 }
@@ -5185,6 +5259,108 @@ function withSeed(seed,fn){
 const yieldUI=()=>new Promise(r=>setTimeout(r,0));
 
 // ═══════════════════════════════════════════════════════════════════════
+// GENERATION WEB WORKER — runs the pure engine (the /*ENGINE_BEGIN*/ …
+// /*ENGINE_END*/ block, shipped verbatim) on a background thread of the
+// player's own device, so long generations (Master, 10×10+, Daily) never
+// freeze the page. No server is involved. If workers are unavailable
+// (old browser, blocked blob: URLs, jsdom) everything falls back to the
+// main-thread loop with identical results.
+// ═══════════════════════════════════════════════════════════════════════
+let genWorker=null,genWorkerOK=null,genWorkerBusy=false,_wJob=0;
+const _wPending=new Map();
+function workerMain(){
+  self.onmessage=e=>{
+    const m=e.data;
+    try{
+      if(m.type==='gen'){
+        if(m.cfg)customCfg=m.cfg;
+        let res=null,a=0;
+        while(!res){
+          a++;
+          try{res=generatePuzzleSync(m.n,m.diff,m.singles);}catch(err){res=null;}
+          if(!res&&a%5===0)self.postMessage({id:m.id,progress:a});
+        }
+        self.postMessage({id:m.id,result:res,attempts:a});
+      }else if(m.type==='daily'){
+        self.postMessage({id:m.id,result:buildDailySync(m.date)});
+      }else if(m.type==='ping')self.postMessage({id:m.id,result:'pong'});
+    }catch(err){self.postMessage({id:m.id,error:String(err&&err.message||err)});}
+  };
+}
+function workerSource(){
+  const sc=[...document.scripts].find(x=>x.textContent.includes('/*ENGINE_'+'BEGIN*/'));
+  const txt=sc.textContent;
+  const engine=txt.slice(txt.indexOf('/*ENGINE_'+'BEGIN*/'),txt.indexOf('/*ENGINE_'+'END*/'));
+  return [
+    'let curLang="en";',                                   // hint wording is irrelevant off-screen
+    'const RC=Array.from({length:12},(_,i)=>({name:"R"+i,fill:"#888",edge:"#888",light:"#888"}));',
+    'function colorName(x){return x;}',
+    'const range='+range.toString()+';',shuffle.toString(),'const D4='+JSON.stringify(D4)+';',inB.toString(),
+    engine,
+    hashStr.toString(),withSeed.toString(),buildDailySync.toString(),
+    'const DAILY_VARIANTS='+JSON.stringify(DAILY_VARIANTS)+';',
+    workerMain.toString(),'workerMain();'].join('\n');
+}
+function getGenWorker(){
+  if(genWorkerOK===false||typeof Worker==='undefined'||typeof Blob==='undefined')return null;
+  if(genWorker)return genWorker;
+  try{
+    const url=URL.createObjectURL(new Blob([workerSource()],{type:'text/javascript'}));
+    genWorker=new Worker(url);
+    genWorker.onmessage=e=>{
+      const m=e.data,p=_wPending.get(m.id);if(!p)return;
+      if(m.progress!==undefined){if(p.onProgress)p.onProgress(m.progress);return;}
+      _wPending.delete(m.id);genWorkerBusy=_wPending.size>0;
+      if(m.error)p.reject(new Error(m.error));else p.resolve(m.result);
+    };
+    genWorker.onerror=e=>{                                  // e.g. blob: workers blocked → permanent fallback
+      if(e&&e.preventDefault)e.preventDefault();
+      genWorkerOK=false;
+      const pend=[..._wPending.values()];_wPending.clear();genWorkerBusy=false;
+      try{genWorker.terminate();}catch(_){}
+      genWorker=null;
+      pend.forEach(p=>p.reject(new Error('worker failed')));
+    };
+    genWorkerOK=true;
+    return genWorker;
+  }catch(e){genWorkerOK=false;genWorker=null;return null;}
+}
+function workerCall(msg,onProgress){
+  return new Promise((resolve,reject)=>{
+    const w=getGenWorker();if(!w)return reject(new Error('no worker'));
+    const id=++_wJob;_wPending.set(id,{resolve,reject,onProgress});genWorkerBusy=true;
+    w.postMessage({...msg,id});
+  });
+}
+// Stop any background generation (a generation loop cannot be interrupted, so
+// the worker is terminated and lazily re-created on the next request).
+function cancelGeneration(){
+  genAborted=true;
+  if(genWorker&&genWorkerBusy){
+    const pend=[..._wPending.values()];_wPending.clear();genWorkerBusy=false;
+    try{genWorker.terminate();}catch(_){}
+    genWorker=null;
+    pend.forEach(p=>p.reject(new Error('cancelled')));
+  }
+}
+// Entry point used by initPuzzle: worker first, main-thread loop as fallback.
+let _genJob=0;
+function startGeneration(n,diff,maxSingles){
+  const job=++_genJob;
+  workerCall({type:'gen',n,diff,singles:maxSingles,cfg:diff==='custom'?customCfg:null},
+    a=>{if(!genAborted)setGenAttempts(`Attempt ${a}…`);})
+    .then(res=>{
+      if(genAborted||job!==_genJob||!res)return;
+      try{stopProgress(true);onPuzzleReady(n,diff,res);}
+      catch(e){console.error('onPuzzleReady threw',e);runGenLoop(n,diff,maxSingles,0);}
+    })
+    .catch(err=>{
+      if(err&&err.message==='cancelled')return;
+      if(!genAborted)runGenLoop(n,diff,maxSingles,0);      // no worker → main-thread loop
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 // TECHNIQUE TRAINING — drills that pause a real board right before one
 // specific deduction. Data: puzzle code + ':' + k (solver steps pre-applied).
 // Built offline by tools/build-training-drills.js.
@@ -5242,7 +5418,7 @@ function loadDrill(tech,i){
   autoXOn=true;$('btn-auto-x').classList.add('on');
   for(let r=0;r<N;r++)for(let c=0;c<N;c++)setCellDOM(r,c,cellState[r*N+c]);
   applyAutoX();
-  _wrongPrev=new Set();
+  _wrongPrev=new Set();resetActionLog();
   const {hints}=collectAllHintsAtBestTier();
   const valid=hints.filter(h=>techOfStep(h)===tech);
   trMode={tech,i,start:Int8Array.from(cellState),t0:Date.now(),attempts:0,revealed:false,done:false,
@@ -5359,10 +5535,10 @@ const DAILY_VARIANTS=[{id:'easy',cls:'easy'},{id:'normal',cls:'hard'},{id:'hard'
 let dailyMode=null;     // {date,vid}
 let dailyBusy=false;
 function todayKey(){return dayKey(new Date());}
-async function buildDaily(date){
+function buildDailySync(date){
   const seed=hashStr('queens-daily|'+date),n=7+seed%3;
   let base=null;
-  for(let a=0;a<60&&!base;a++){base=withSeed(seed+a*7919,()=>generatePuzzleSync(n,'hard',0));await yieldUI();}
+  for(let a=0;a<60&&!base;a++)base=withSeed(seed+a*7919,()=>generatePuzzleSync(n,'hard',0));
   if(!base)throw new Error('daily base failed');
   const out={date,n,v:{normal:{r:base.regions,s:base.solution}}};
   for(const vr of DAILY_VARIANTS){
@@ -5371,17 +5547,22 @@ async function buildDaily(date){
     for(let a=0;a<10&&!v;a++){
       const fit=withSeed(seed^hashStr(vr.id+'|'+a),()=>fitToClass(n,base.regions,base.solution,vr.cls,n*n*4));
       if(fit)v={r:Array.from(fit.map),s:base.solution};
-      await yieldUI();
     }
     for(let a=0;a<60&&!v;a++){           // fallback: fresh board of the right class
       const g=withSeed(seed^hashStr(vr.id+'#'+a),()=>generatePuzzleSync(n,vr.cls,0));
       if(g)v={r:g.regions,s:g.solution};
-      await yieldUI();
     }
     if(!v)throw new Error('daily variant failed');
     out.v[vr.id]=v;
   }
   return out;
+}
+// Same boards either way: the worker runs the identical engine + seeded RNG.
+async function buildDaily(date){
+  const viaWorker=await workerCall({type:'daily',date}).catch(()=>null);
+  if(viaWorker)return viaWorker;
+  await yieldUI();
+  return buildDailySync(date);
 }
 async function ensureDaily(){
   const date=todayKey();
@@ -5466,7 +5647,9 @@ function logSolve(){
   if(!Array.isArray(SAVE.log))SAVE.log=[];
   SAVE.log.push({d:Date.now(),k:curMeta.kind,df:curMeta.diff,n:N,t:timerSeconds,mv:moves,
     h:assist.hints,ht:(assist.ht||[]).slice(0,20),mis:assist.mis||0,sol:!!assist.sol,
-    xt:expectedSeconds(N,solutionSteps)});
+    xt:expectedSeconds(N,solutionSteps),
+    rv:SAVE.lastReview?{sc:SAVE.lastReview.sc,wq:SAVE.lastReview.wq,wx:SAVE.lastReview.wx,me:SAVE.lastReview.me,
+      hs:SAVE.lastReview.hs,rx:SAVE.lastReview.rx,ch:SAVE.lastReview.ch}:null});
   if(SAVE.log.length>400)SAVE.log.splice(0,SAVE.log.length-400);
 }
 const speedIdx=e=>Math.min(300,Math.round(100*e.xt/Math.max(5,e.t)));
@@ -5517,7 +5700,17 @@ function evaluatePlayer(){
     const untried=(need||[]).find(id=>trSummary(id).done===0);
     if(untried)A('advTryTech',{name:t('techN_'+untried)},untried);
   }
-  // 7. no hints at all and fast → keep it up
+  // 7. habits seen in the move-by-move reviews (order-independent)
+  const rvs=recent.map(e=>e.rv).filter(Boolean);
+  if(rvs.length>=3){
+    const m=k=>avg(rvs.map(r=>r[k]||0));
+    ev.quality=Math.round(m('sc'));
+    if(m('me')>=0.5)A('advScan',{n:m('me').toFixed(1)},'t1');
+    if(m('wx')>=0.3)A('advWrongX',{n:m('wx').toFixed(1)});
+    if(m('rx')>=5)A('advAutoX',{n:Math.round(m('rx'))});
+    if(m('ch')>=2)A('advChurn',{n:m('ch').toFixed(1)});
+  }
+  // 8. no hints at all and fast → keep it up
   if(ev.hintRate!=null&&ev.hintRate<0.2&&ev.si!=null&&ev.si>=110)A('advStrong');
   if(!ev.advice.length)A('advSteady');
   return ev;
@@ -5544,10 +5737,13 @@ function renderStatsModal(){
   let h=`<div class="ach-stats">`+
     tile(clean.length,'stSolved')+
     tile(ev.si==null?'—':Math.round(ev.si),'stSpeed',band?t(band):'')+
+    tile(ev.quality==null?'—':ev.quality,'stQuality')+
     tile(ev.hintRate==null?'—':ev.hintRate.toFixed(1),'stHintRate')+
     tile(ev.misRate==null?'—':ev.misRate.toFixed(1),'stMisRate')+
     tile(fmtTime(tot).replace(/^(\d+):/,(m,a)=>a>=60?Math.floor(a/60)+'h'+String(a%60).padStart(2,'0')+':':m),'stTotalTime')+
-    tile(Math.max(SAVE.stats.bestStreak||0,liveStreak()),'stStreak')+`</div>`;
+    tile(Math.max(SAVE.stats.bestStreak||0,liveStreak()),'stStreak')+
+    tile(dailyStreak(),'stDailyStreak')+`</div>`+
+    (SAVE.lastReview?`<p style="margin-top:8px"><button class="btn-hint-inline" id="st-open-review">${t('stLastReview')}</button></p>`:'');
   // advice first — it is the point of the page
   h+=`<h4 class="st-h">${t('stAdviceTitle')}</h4><ul class="st-advice">`+ev.advice.map(a=>
     `<li>${tf(a.k,a.v)}${a.tech?` <button class="btn-hint-inline st-train" data-train="${a.tech}">${t('stTrainBtn')}</button>`:''}</li>`).join('')+`</ul>`;
@@ -5650,9 +5846,11 @@ $('train-pane').addEventListener('click',e=>{
 });
 $('daily-pane').addEventListener('click',e=>{const b=e.target.closest('[data-daily]');if(b&&!b.disabled)playDaily(b.dataset.daily);});
 $('stats-btn').addEventListener('click',openStatsModal);
+$('win-review').addEventListener('click',openReviewModal);
 $('stats-close').addEventListener('click',closeStatsModal);
 $('stats-modal').addEventListener('click',e=>{
   if(e.target===$('stats-modal'))return closeStatsModal();
+  if(e.target.id==='st-open-review'){closeStatsModal();openReviewModal();return;}
   const b=e.target.closest('[data-train]');
   if(b){closeStatsModal();SAVE.prefs.modeTab='train';loadDrill(b.dataset.train,0);}
 });
@@ -5662,6 +5860,140 @@ $('icon-select').addEventListener('change',e=>{
   if(iconPref==='random')iconRandom=Object.keys(QICONS)[0|Math.random()*6];
   SAVE.prefs.icon=iconPref;persist();applyIcon();
 });
+
+// ═══════════════════════════════════════════════════════════════════════
+// SOLVE REVIEW — order-independent evaluation of how you actually played.
+// Every change you make to the board is logged as [time, cell, newState, src].
+// After a win the log is replayed: each action is judged against the board as
+// it was at that moment (not against the solver's order), and every long pause
+// is checked against what the engine says was available right then.
+//   src: u = you · h = applied hint · s = solution step · z = undo · r = restart
+// ═══════════════════════════════════════════════════════════════════════
+let _actSrc='u';
+let _normPrev=null;
+function normState(){return Int8Array.from(cellState,v=>v===3?0:v);}
+function resetActionLog(){_normPrev=normState();_actSrc='u';}
+function trackActions(){
+  if(solved&&_actSrc==='u')return;
+  if(!_normPrev||_normPrev.length!==cellState.length){_normPrev=normState();return;}
+  if(!assist.al)assist.al=[];
+  const cur=normState();
+  for(let i=0;i<cur.length;i++)if(cur[i]!==_normPrev[i]&&assist.al.length<600)assist.al.push([timerSeconds,i,cur[i],_actSrc]);
+  _normPrev=cur;_actSrc='u';
+}
+const cellLbl=i=>String.fromCharCode(65+i%N)+(1+(i/N|0));
+function blockedByQueen(S,i){
+  const r=i/N|0,c=i%N,reg=regions[i];
+  for(let j=0;j<N*N;j++){
+    if(S[j]!==2||j===i)continue;
+    const jr=j/N|0,jc=j%N;
+    if(jr===r||jc===c||regions[j]===reg||(Math.abs(jr-r)<=1&&Math.abs(jc-c)<=1))return true;
+  }
+  return false;
+}
+function forcedNow(S,i){
+  // Is cell i the last open cell of its region, row or column right now?
+  const open=j=>S[j]===0&&!blockedByQueen(S,j);
+  if(!open(i))return false;
+  const r=i/N|0,c=i%N;
+  let reg=0,row=0,col=0;
+  for(let j=0;j<N*N;j++){if(!open(j))continue;if(regions[j]===regions[i])reg++;if((j/N|0)===r)row++;if(j%N===c)col++;}
+  return reg===1||row===1||col===1;
+}
+function analyzeSolveReview(){
+  const al=(assist.al||[]).slice();
+  const S=new Int8Array(N*N);
+  const isSolCell=i=>solution[i/N|0]===i%N;
+  const rv={sc:100,wq:0,wx:0,rx:0,ch:0,me:0,hs:0,lp:0,undo:0,carry:0,items:[],tips:[]};
+  const openWrong=new Map();               // cell → {t,kind}
+  const touches=new Map();
+  // pause threshold: 3× the median gap, at least 12 s
+  const gaps=[];let prevT=0;
+  for(const e of al){gaps.push(e[0]-prevT);prevT=e[0];}
+  const med=gaps.length?gaps.slice().sort((a,b)=>a-b)[Math.floor(gaps.length/2)]:0;
+  const stallMin=Math.max(12,med*3);
+  prevT=0;
+  for(let k=0;k<al.length;k++){
+    const [tm,i,s,src]=al[k];
+    const gap=tm-prevT;
+    // ── long pause before this action: what was available on the board right then?
+    if(gap>=stallMin&&(k===0||al[k-1][0]!==tm)){
+      const wrong=[...openWrong.entries()][0];
+      if(wrong){
+        rv.items.push({t:prevT,d:gap,k:'rvStallWrong',v:{d:fmtTime(gap),c:cellLbl(wrong[0]),at:fmtTime(wrong[1].t),what:t(wrong[1].kind==='q'?'rvWrongQWord':'rvWrongXWord')}});
+      }else{
+        let h=null;try{h=getNextHintForState(N,regions,Int8Array.from(S));}catch(_){}
+        if(h&&(h.tier||0)<7){
+          const tech=techOfStep(h),tier=h.tier||0;
+          const where=h.type==='queen'?cellLbl(h.row*N+h.col):(h.cells||[]).slice(0,3).map(([r,c])=>cellLbl(r*N+c)).join(', ');
+          if(tier<=1){rv.me++;rv.items.push({t:prevT,d:gap,k:'rvStallEasy',v:{d:fmtTime(gap),name:t('techN_'+(tech||'t'+tier)),c:where},tech});}
+          else{rv.hs++;rv.items.push({t:prevT,d:gap,k:'rvStallHard',v:{d:fmtTime(gap),name:t('techN_'+(tech||'t3')),c:where},tech:tech||'t3'});}
+        }
+      }
+    }
+    prevT=tm;
+    if(src==='u'){
+      // churn = undecided toggling; creating or fixing a wrong mark is scored separately
+      const isMistakeEdit=(s===1&&isSolCell(i))||(s===2&&!isSolCell(i))||openWrong.has(i);
+      if(!isMistakeEdit)touches.set(i,(touches.get(i)||0)+1);
+      if(s===2){
+        if(!isSolCell(i)){rv.wq++;openWrong.set(i,{t:tm,kind:'q'});rv.items.push({t:tm,k:'rvWrongQ',v:{c:cellLbl(i)}});}
+        else if(!forcedNow(S,i))rv.lp++;
+      }else if(s===1){
+        if(isSolCell(i)){rv.wx++;openWrong.set(i,{t:tm,kind:'x'});rv.items.push({t:tm,k:'rvWrongX',v:{c:cellLbl(i)}});}
+        else if(blockedByQueen(S,i))rv.rx++;
+      }else if(s===0){
+        const w=openWrong.get(i);
+        if(w){rv.carry+=tm-w.t;openWrong.delete(i);rv.items.push({t:tm,k:'rvFixed',v:{c:cellLbl(i),d:fmtTime(tm-w.t)}});}
+      }
+      if(s!==0&&openWrong.has(i)&&!(s===2&&!isSolCell(i))&&!(s===1&&isSolCell(i))){const w=openWrong.get(i);rv.carry+=tm-w.t;openWrong.delete(i);}
+    }else if(src==='z')rv.undo++;
+    else if(src==='r')openWrong.clear();
+    S[i]=s;
+  }
+  rv.ch=[...touches.values()].filter(v=>v>=3).length;
+  rv.sc=Math.max(0,Math.round(100-8*rv.wq-6*rv.wx-4*rv.me-2*rv.ch-Math.min(10,Math.floor(rv.rx/3))));
+  rv.grade=rv.sc>=90?'A':rv.sc>=75?'B':rv.sc>=60?'C':'D';
+  // top suggestions, most costly first
+  const easy=rv.items.find(x=>x.k==='rvStallEasy');
+  const wx=rv.items.find(x=>x.k==='rvWrongX');
+  const hard=rv.items.filter(x=>x.k==='rvStallHard').sort((a,b)=>b.d-a.d)[0];
+  if(rv.wx)rv.tips.push({k:'rvTipWrongX',v:{c:wx.v.c,n:rv.wx,d:fmtTime(rv.carry)}});
+  if(rv.wq)rv.tips.push({k:'rvTipWrongQ',v:{n:rv.wq}});
+  if(easy)rv.tips.push({k:'rvTipEasy',v:{n:rv.me,c:easy.v.c,name:easy.v.name},tech:easy.tech});
+  if(hard)rv.tips.push({k:'rvTipHard',v:{d:hard.v.d,name:hard.v.name},tech:hard.tech});
+  if(rv.rx>=5)rv.tips.push({k:'rvTipRedundant',v:{n:rv.rx}});
+  if(rv.ch)rv.tips.push({k:'rvTipChurn',v:{n:rv.ch}});
+  if(!rv.wq&&!rv.wx&&!rv.me&&rv.lp>=Math.ceil(N/2))rv.tips.push({k:'rvTipLeaps',v:{n:rv.lp}});
+  if(!rv.tips.length)rv.tips.push({k:'rvTipClean'});
+  rv.tips=rv.tips.slice(0,4);
+  rv.items.sort((a,b)=>a.t-b.t);
+  rv.n=N;rv.time=timerSeconds;rv.when=Date.now();
+  return rv;
+}
+function renderReviewModal(){
+  const rv=SAVE.lastReview;
+  $('review-title').textContent=t('rvTitle');
+  if(!rv){$('review-body').innerHTML=`<p class="pane-intro">${t('rvNone')}</p>`;return;}
+  const tile=(v,k)=>`<div class="ach-stat"><b>${v}</b><span>${t(k)}</span></div>`;
+  let h=`<div class="ach-stats">`+tile(`${rv.grade} · ${rv.sc}`,'rvScore')+tile(fmtTime(rv.time),'statTime')+
+    tile(rv.wq+rv.wx,'rvMistakes')+tile(rv.me,'rvMissed')+tile(rv.rx,'rvRedundant')+tile(rv.ch,'rvChurn')+`</div>`;
+  h+=`<h4 class="st-h">${t('rvTipsTitle')}</h4><ul class="st-advice">`+rv.tips.map(x=>
+    `<li>${tf(x.k,x.v)}${x.tech?` <button class="btn-hint-inline st-train" data-train="${x.tech}">${t('stTrainBtn')}</button>`:''}</li>`).join('')+`</ul>`;
+  h+=`<h4 class="st-h">${t('rvTimeline')}</h4>`+(rv.items.length?`<ul class="rv-tl">`+rv.items.map(x=>
+    `<li><span class="rv-t">${fmtTime(x.t)}</span><span>${tf(x.k,x.v)}</span></li>`).join('')+`</ul>`:`<p class="pane-intro">${t('rvNoEvents')}</p>`);
+  h+=`<p class="st-note">${t('rvNote')}</p>`;
+  $('review-body').innerHTML=h;
+}
+function openReviewModal(){renderReviewModal();$('review-modal').style.display='flex';}
+function closeReviewModal(){$('review-modal').style.display='none';}
+$('review-close').addEventListener('click',closeReviewModal);
+$('review-modal').addEventListener('click',e=>{
+  if(e.target===$('review-modal'))return closeReviewModal();
+  const b=e.target.closest('[data-train]');
+  if(b){closeReviewModal();$('win-banner').classList.remove('show');SAVE.prefs.modeTab='train';loadDrill(b.dataset.train,0);}
+});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('review-modal').style.display!=='none')closeReviewModal();});
 
 // Robust startup: never let a single failure leave a blank / "loading error"
 // screen. Each init step is guarded independently; if the first puzzle fails to

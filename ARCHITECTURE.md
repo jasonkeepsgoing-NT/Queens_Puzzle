@@ -187,3 +187,17 @@ cd /home/claude && npm install jsdom --no-save
 | D26 | Tier 6 (Region Confinement) 在 1058 个样本中出现 0 次(被 Tier 2 单区域排除覆盖),训练与说明不再单列 | 数据驱动 |
 
 「待验证」12×12 的 easy / intensive 生成在 jsdom 中单次 >120s 未完成;9–11 正常(秒级)。
+
+---
+
+## 10. 2026-10-27 第二轮 (Web Worker / 解题复盘)
+
+**版本标注: 2026-10-27 19:12 UTC**
+
+| # | 决策 | 理由 |
+|---|------|------|
+| D27 | 生成走 Web Worker: 运行时把 `/*ENGINE_BEGIN*/…/*ENGINE_END*/` 纯引擎块 + 辅助函数 toString 拼成 blob worker;`cancelGeneration()` 终止并按需重建;不可用时回退主线程 `runGenLoop` | 用户同意开启;Worker 是玩家本机后台线程,不是服务器 |
+| D28 | 解题复盘与顺序无关: 记录每次棋盘变化 `[t,cell,state,src]`,赛后按当时盘面逐步判定;停顿用引擎判断当时可证明什么 | 用户要求「不按 solution 顺序评估,而是指出可优化的操作」 |
+| D29 | 图标候选(24 个)仅在 scratchpad 预览,用户选定前不进分支 | 用户要求 |
+
+「待验证」复盘扣分权重(8/6/4/2)与停顿阈值(3×中位间隔, ≥12s)为经验值。

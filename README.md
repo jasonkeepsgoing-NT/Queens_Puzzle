@@ -1,6 +1,6 @@
 # Queens Puzzle — Simulator & Trainer
 
-A single-file, zero-dependency HTML **Queens** logic puzzle, with a human-style multi-tier solving engine, difficulty-graded generators, a 300-level Challenge mode, bilingual UI (EN / 中文) and six themes.
+A single-file, zero-dependency HTML **Queens** logic puzzle, with a human-style multi-tier solving engine, difficulty-graded generators, a 300-level Challenge mode, technique Training, a Daily puzzle in three difficulties, personal stats with solving advice, bilingual UI (EN / 中文) and six themes.
 
 > Inspired by LinkedIn's daily puzzle games — the rules are the same as LinkedIn's *Queens*. This is an independent project, not affiliated with LinkedIn.
 
@@ -27,19 +27,23 @@ The engine scans tiers in strict order 0 → 7 and returns the first technique t
 | 6 | ✕ Region Confinement | One region's open cells all lie in a single row or column. |
 | 7 | ⚠ Lookahead | Trial placement forces a contradiction. **The only tier that guesses.** |
 
-Tiers 0–6 are pure forward deduction. A board that cannot be finished without Tier 7 is flagged with a **dot** on its difficulty badge (e.g. `intensive.`) so you always know whether a puzzle is fair.
+Tiers 0–6 are pure forward deduction. **No board the game serves ever needs Tier 7** — generators reject or reshape such boards, and user-built or imported boards that need it are refused. (Tier 6 is kept for completeness; in practice its cases are already caught by Tier 2.)
 
 ### Difficulty levels
 
-| Level | Definition |
+One function (`classifyDifficulty`) defines the classes from the solver's own solution path; every generator, the Challenge levels, the Daily boards and the in-game Difficulty Guide use it. Each board lands in exactly one class.
+
+| Level | Definition (n = board size) |
 |---|---|
-| **Easy** | Almost entirely "only cell left" spotting. |
-| **Medium** | Adds basic elimination before the forced cells appear. |
-| **Hard** | Requires multi-region reasoning (N regions ↔ N lines). |
-| **Intensive** | Dense deduction chains including killer logic. |
-| **Advanced ★** | Deliberately slow to open; *may* require lookahead. |
-| **Master ★★** | **Guaranteed 100% pure logic** — never needs trial and error — yet forces the deepest techniques (Group Lock / Region Confinement). The fairest hardest level. |
-| **Custom** | You choose board size and single-cell region budget. |
+| **Easy** | Tiers 0–2 only, and every Tier-2 step involves a single region (a region lying in one line clears the rest of it). |
+| **Medium** | Tiers 0–2 with at least one **multi-region** exclusion (2+ regions ↔ the same 2+ lines). No Killer. |
+| **Hard** | Needs Tier 3 Killer, but fewer than ⌈n/3⌉ deep (Tier 3+) steps. |
+| **Intensive** | Killer is the backbone: ≥ ⌈n/3⌉ Tier-3 steps, nothing above Tier 3. |
+| **Advanced ★** | Needs Tier 4+ (Zone/Overflow or Group Lock) at least once, below the Master bar. |
+| **Master ★★** | Tier 5 Group Lock, ≥ 0.35n deep steps, ≥ 0.7n Tier-2+ steps, first queen after ≥ 0.3n steps. |
+| **Custom** | You choose board size, region shapes and single-cell region budget (still pure logic). |
+
+Before this version, the Easy/Medium/Hard generators were statistically indistinguishable (measured on 540 boards: in the old "Hard" output, 85 of 180 boards were Easy by the definition above). Generation now **hill-climbs region borders into the requested class** (`fitToClass`: simplify when too hard, complexify when too easy, keeping the solution unique and regions connected).
 
 Generation is **difficulty-first**: candidate boards are mutated and re-scored against the human solver until they clear the bar. The generator never silently downgrades — if you ask for Master, you wait until you get a real Master.
 
@@ -49,14 +53,30 @@ Generation is **difficulty-first**: candidate boards are mutated and re-scored a
 
 Six tracks (Easy → Master ★★), **50 levels each**, 10 chapters of 5. Board sizes vary between 5×5 and 10×10 while difficulty within a track stays level; **every 5th level is a 👑 boss** drawn from the hardest band of its track (and at least 7×7 / 8×8).
 
-- Levels are pre-generated offline and graded by the in-page solver (`tools/`), so they load instantly and are identical for every player. All 300 are verified unique, connected and solvable by the logic engine (only Advanced may need lookahead).
+- Levels are pre-generated offline and graded by the in-page solver (`tools/`), so they load instantly and are identical for every player. All 300 are verified unique, connected, pure-logic and of exactly their track's class. Track ratings rise monotonically (avg solver rating 41 → 54 → 67 → 76 → 101 → 126).
 - **Stars per level**: 3★ = no hints and within par time · hints or over par cost a star · viewing the solution caps the level at 1★ (asks for confirmation first).
 - **Motivation layer**: level map with stars and best times, chess-piece ranks from total stars (Pawn → Grandmaster), 16 trophies, daily solving streak, free-play personal bests per size/difficulty, confetti / boss celebration, toast notifications.
+
+## Technique Training
+
+Seven techniques (Tier 0 → Tier 5, Tier 2 split into single- and multi-region), **12 drills each** on 5×5–10×10 boards. A drill pauses a real board right before one deduction — no easier move exists at that moment — and asks you to place the forced queen or mark every cell the technique rules out. *Check* gives graded feedback (missing cells, extra cells, a valid deduction of another technique, a ✕ on a solution queen); a correct answer shows the solver's explanation with the board highlight. Each technique has a "How it works" card. Results (first try / solved / revealed, time) feed the stats.
+
+## Daily puzzle
+
+One date-seeded board family per day, identical for everyone: **Normal** (Hard class) is generated from the date seed; **Easy** and **Hard** (Intensive class) are the *same layout* hill-climbed down/up into their class, so the three share a family resemblance. Built in the browser in about a second and cached for the day. 14-day calendar and daily streak.
+
+## Personal stats & solving evaluation
+
+Every solve is logged (size, class, time, moves, hints and the tier of each hint, wrong queens placed, solution viewed). **Speed index** = 100 × expected ÷ actual time, where expected time comes from the board's own solution path (scan cost by size + a cost per deduction tier). The stats dialog shows tiles, a 30-solve speed trend, a per-difficulty table, a technique profile (Training accuracy, time to find, hint dependence) and rule-based **advice** — the technique that blocks you (with a one-click drill), wrong-queen habits, big-board slowdown, trend, readiness for the next difficulty. *The cost model is a heuristic, not yet fitted to player data.*
+
+## Queen icons
+
+A dropdown next to the theme picker: **♛ Queen** (default), **✨ Theme** (follows the theme: ☀️ Sun · 🐚 Shell · 🌸 Flower · 🌙 Moon · 🪼 Jellyfish · 💎 Gem), any single icon, or **🎲 Random** (shown as `Random (current icon)`). Icons are SVG masks painted in the theme's queen colour, so they inherit each theme's palette.
 
 ## Saved locally
 
 Uses `localStorage` when the browser allows it (everything still works without it):
-challenge progress, stars, best times, trophies, stats and streak · language · theme (a specific theme, or **Random** — shown as `Random (current theme)`) · last free-play size/difficulty · the board in progress (marks, moves, timer), so a reload continues where you left off. A *Reset progress* button lives in the Trophies dialog.
+challenge progress, stars, best times, trophies, solve log, Training results, Daily boards and calendar, streaks · language · queen icon · theme (a specific theme, or **Random** — shown as `Random (current theme)`) · last free-play size/difficulty · the board in progress (marks, moves, timer), so a reload continues where you left off. A *Reset progress* button lives in the Trophies dialog.
 
 ## Features
 
@@ -83,7 +103,8 @@ tools/              Challenge level pipeline + headless UI test
 ```bash
 npm install jsdom --no-save
 node tools/gen-challenge-pool.js master 5,6,7,8,9,10 120 pool/master.jsonl 2400   # repeat per difficulty
-node tools/build-challenge-levels.js pool/      # selects 6×50 levels, patches index.html
+node tools/build-challenge-levels.js pool/      # classifies + selects 6×50 levels, patches index.html
+node tools/build-training-drills.js pool/       # 7×12 technique drills, patches index.html
 node tools/test-ui.js                           # integrity + UI flow regression
 ```
 

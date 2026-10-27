@@ -25,12 +25,13 @@ while(made<count&&Date.now()-t0<budget){
   const a=w.analyzePuzzleDifficulty(n,res.regions,res.solution);
   if(!a){made++;continue;}
   const lh=a.steps.some(s=>(s.tier||0)>=7);
-  const rec={diff,n,ms:Date.now()-s0,tries,lh,maxTier:a.maxTier,score:Math.round(a.score*10)/10,
+  const cls=w.classifyDifficulty(n,a);
+  const rec={diff,n,cls,ms:Date.now()-s0,tries,lh,t2m:a.t2multi,tc:a.tierCounts,maxTier:a.maxTier,score:Math.round(a.score*10)/10,
     adv:a.advCount,deep:a.deepCount,high:a.highCount,delay:a.stepsBeforeFirstQueen,
     fq:a.firstQueenTier,steps:a.steps.length,
     r:res.regions.join(''),s:res.solution.join('')};
   out.write(JSON.stringify(rec)+'\n');
-  console.log(`[${diff}] n=${n} ${rec.ms}ms tries=${tries} maxT=${rec.maxTier} score=${rec.score} lh=${lh}`);
+  console.log(`[${diff}] n=${n} ${rec.ms}ms tries=${tries} cls=${cls} maxT=${rec.maxTier} score=${rec.score} lh=${lh}`);
   made++;
 }
 out.end();setTimeout(()=>process.exit(0),200);

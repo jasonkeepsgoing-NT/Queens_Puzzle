@@ -49,7 +49,8 @@ const solveNow=w=>ev(w,`for(let r=0;r<N;r++){cellState[r*N+solution[r]]=2;setCel
         for(let r=0;r<p.n;r++){const q=r*p.n+p.solution[r];if(!isConnected(reg,reg[q],p.n,q))bad.push(d+'#'+(i+1)+' region '+reg[q]+' disconnected');}
         const steps=buildSolutionSteps(p.n,p.regions,p.solution);
         if(steps.filter(s=>s.type==='queen').length!==p.n)bad.push(d+'#'+(i+1)+' engine cannot finish');
-        if(d!=='advanced'&&steps.some(s=>(s.tier||0)>=7))bad.push(d+'#'+(i+1)+' needs lookahead');
+        if(steps.some(s=>(s.tier||0)>=7))bad.push(d+'#'+(i+1)+' needs trial & error');
+        const cls=classifyDifficulty(p.n,analyzePuzzleDifficulty(p.n,p.regions,p.solution));if(cls!==d)bad.push(d+'#'+(i+1)+' class '+cls);
       });}
     return {bad,sizes,total};})()`);
   ok(integrity.total===300&&integrity.bad.length===0,`300 levels unique/solvable/connected (${JSON.stringify(integrity.sizes)}) ${integrity.bad.slice(0,5).join('; ')}`);
@@ -101,7 +102,7 @@ const solveNow=w=>ev(w,`for(let r=0;r<N;r++){cellState[r*N+solution[r]]=2;setCel
   ok(ev(w,`chMode&&chMode.diff==='easy'&&chMode.level===6`),'reload resumes challenge level 6');
   ok(ev(w,`cellState[0]===1&&moves===1`),'reload restores marks and moves');
   ok(ev(w,`currentTheme`)==='dark2'&&w.document.getElementById('theme-select').value==='dark2','saved theme restored');
-  ok(ev(w,`curLang`)==='zh'&&/闯关/.test(w.document.getElementById('ch-title').textContent),'saved language restored');
+  ok(ev(w,`curLang`)==='zh'&&/闯关/.test(w.document.getElementById('tab-btn-ch').textContent),'saved language restored');
   ok(ev(w,`chCleared('easy')`)===5,'challenge progress persisted (5 cleared)');
   w.document.getElementById('theme-select').value='random';
   w.document.getElementById('theme-select').dispatchEvent(new w.Event('change'));
@@ -114,6 +115,52 @@ const solveNow=w=>ev(w,`for(let r=0;r<N;r++){cellState[r*N+solution[r]]=2;setCel
   ok(w.document.getElementById('ch-hud').style.display==='none','HUD hidden in free play');
   solveNow(w);
   ok(ev(w,`Object.keys(SAVE.pb).length`)===1,'free-play personal best recorded');
+
+  // ── 9. Technique training: every drill has a unique-tier answer; correct answers pass, wrong ones fail ──
+  const drill=ev(w,`(()=>{const bad=[];let n=0;
+    for(const tc of TECHS){const codes=trCodes(tc.id);if(codes.length!==12)bad.push(tc.id+' count '+codes.length);
+      codes.forEach((_,j)=>{n++;loadDrill(tc.id,j);
+        const {tier}=collectAllHintsAtBestTier();
+        if(tier!==tc.tier)bad.push(tc.id+'#'+j+' best tier '+tier);
+        if(!trMode.valid.length||trMode.valid.some(h=>techOfStep(h)!==tc.id))bad.push(tc.id+'#'+j+' no valid answer');
+        const h=trMode.valid[0];
+        if(tc.type==='queen'){cellState[h.row*N+h.col]=2;setCellDOM(h.row,h.col,2);}
+        else h.cells.forEach(([r,c])=>{cellState[r*N+c]=1;setCellDOM(r,c,1);});
+        trCheck();
+        if(!trMode.done||trRec(tc.id).r[j].s!==2)bad.push(tc.id+'#'+j+' correct answer rejected: '+(trMode.fb&&trMode.fb.msg));
+      });}
+    // a wrong answer: ✕ on a solution cell
+    loadDrill('t3',0);const r0=0,c0=solution[0];
+    if(trMode.start[r0*N+c0]===0){cellState[r0*N+c0]=1;trCheck();if(trMode.done||trMode.fb.kind!=='bad')bad.push('wrong answer accepted');}
+    return {bad,n};})()`);
+  ok(drill.n===84&&drill.bad.length===0,`training: 84 drills verified (target tier, correct accepted, wrong rejected) ${drill.bad.slice(0,4).join('; ')}`);
+  ok(ev(w,`trMode&&document.getElementById('ch-hud').textContent.includes('Check')||document.getElementById('ch-hud').textContent.includes('检查')`),'training HUD shows Check button');
+
+  // ── 10. Daily: deterministic, three classes, same layout family ──
+  const daily=await ev(w,`(async()=>{const a=await buildDaily('2026-10-27');const b=await buildDaily('2026-10-27');
+    const cls=k=>classifyDifficulty(a.n,analyzePuzzleDifficulty(a.n,a.v[k].r,a.v[k].s));
+    const same=JSON.stringify(a)===JSON.stringify(b);
+    const diffCells=k=>a.v[k].r.filter((x,i)=>x!==a.v.normal.r[i]).length;
+    return {same,n:a.n,c:[cls('easy'),cls('normal'),cls('hard')],d:[diffCells('easy'),diffCells('hard')]};})()`);
+  ok(daily.same&&daily.c.join()==='easy,hard,intensive',`daily deterministic & classes easy/hard/intensive (n=${daily.n}, changed cells vs normal: ${daily.d}) ${daily.c}`);
+  await ev(w,`playDaily('easy')`);
+  ok(ev(w,`dailyMode&&dailyMode.vid==='easy'`),'daily easy loaded');
+  solveNow(w);
+  ok(ev(w,`!!(SAVE.dailyLog[todayKey()]||{}).easy`),'daily completion recorded');
+
+  // ── 11. Stats & evaluation ──
+  ok(ev(w,`SAVE.log.length>=3`),'solve log populated: '+ev(w,`SAVE.log.length`));
+  ev(w,`openStatsModal()`);
+  ok(/Evaluation|评估/.test(w.document.getElementById('stats-body').textContent)&&w.document.querySelector('#stats-body svg.sv'),'stats modal renders advice + trend chart');
+  ev(w,`closeStatsModal()`);
+
+  // ── 12. Icons ──
+  ev(w,`$('icon-select').value='theme';$('icon-select').dispatchEvent(new Event('change'))`);
+  ok(ev(w,`$('board-grid').getAttribute('data-qicon')===THEME_QICON[currentTheme]`),'theme-matched icon applied: '+ev(w,`$('board-grid').getAttribute('data-qicon')`));
+  ev(w,`$('icon-select').value='random';$('icon-select').dispatchEvent(new Event('change'))`);
+  ok(/\(|（/.test(ev(w,`$('icon-select').selectedOptions[0].textContent`)),'random icon shows current: '+ev(w,`$('icon-select').selectedOptions[0].textContent`));
+  ev(w,`$('icon-select').value='queen';$('icon-select').dispatchEvent(new Event('change'))`);
+  ok(ev(w,`!$('board-grid').hasAttribute('data-qicon')`),'queen icon default restores glyph');
 
   // ── 8. Storage blocked → still playable ──
   const dom2=new JSDOM(html,{url:'http://localhost/',runScripts:'dangerously',pretendToBeVisual:true,

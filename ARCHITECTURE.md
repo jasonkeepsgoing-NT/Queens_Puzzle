@@ -169,3 +169,21 @@ cd /home/claude && npm install jsdom --no-save
 工具链: `tools/gen-challenge-pool.js`(jsdom 内调用页面生成器产出候选)→ `tools/build-challenge-levels.js`(挑选并写入 index.html)→ `tools/test-ui.js`(300 关唯一解/连通/可解 + 闯关流程/持久化回归)。
 
 「待验证」par 时间系数 `CH_PAR_K` 与评分中尺寸项 `5·(n−7)` 为经验值,尚无真人数据校准。
+
+---
+
+## 9. 2026-10-27 迭代记录 (难度重定义 / 训练 / 每日 / 统计 / 图标)
+
+**版本标注: 2026-10-27 04:47 UTC**
+
+| # | 决策 | 理由 |
+|---|------|------|
+| D20 | **绝对禁止试错**: 生成器、闯关、每日、训练只输出 Tier 7 不需要的棋盘;用户自建(Build)与载入种子若需 Tier 7 直接拒绝;"." 徽章机制删除 | 用户要求「所有关卡禁止出现必须试错，绝对禁止」;**取代 D6 / D8 中关于 Advanced 允许前瞻的部分** |
+| D21 | **难度唯一定义 `classifyDifficulty`**(见 README 表),生成器用 `fitToClass` 爬山把棋盘推入目标等级 | 实测旧 easy/medium/hard 生成器输出无差别(旧 hard 输出 85/180 实为 easy) |
+| D22 | 技巧训练: 7 技巧 × 12 题,离线挑选(`tools/build-training-drills.js`),运行时预应用前 k 步;答案集合 = 该状态下同技巧的全部提示 | 求解器总取最低层级,保证此刻没有更简单的推理 |
+| D23 | 每日一练: 日期哈希 → mulberry32 临时替换 `Math.random`(`withSeed`)→ Normal(hard 类);Easy/Hard = 同一布局 `fitToClass` 到 easy / intensive | 用户要求「日期种子 + 简化/复杂化 3 难度」;同代码同日期全设备一致 |
+| D24 | 个人统计: 速度指数 = 100×预期/实际;预期 = 5 + 0.25n² + Σ STEP_COST[tier]。「待验证」系数为经验值 | 用户要求速度评估 + 建议 |
+| D25 | 皇后图标: SVG alpha mask(shape/cut)以 `--queen-c` 着色;下拉含 皇后(默认)/主题/6 图标/随机(当前) | 与主题配色自动一致 |
+| D26 | Tier 6 (Region Confinement) 在 1058 个样本中出现 0 次(被 Tier 2 单区域排除覆盖),训练与说明不再单列 | 数据驱动 |
+
+「待验证」12×12 的 easy / intensive 生成在 jsdom 中单次 >120s 未完成;9–11 正常(秒级)。

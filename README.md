@@ -69,15 +69,18 @@ One date-seeded board family per day, identical for everyone: **Normal** (Hard c
 
 Every solve is logged (size, class, time, moves, hints and the tier of each hint, wrong queens placed, solution viewed). **Speed index** = 100 × expected ÷ actual time, where expected time comes from the board's own solution path (scan cost by size + a cost per deduction tier). The stats dialog shows tiles, a 30-solve speed trend, a per-difficulty table, a technique profile (Training accuracy, time to find, hint dependence) and rule-based **advice** — the technique that blocks you (with a one-click drill), wrong-queen habits, big-board slowdown, trend, readiness for the next difficulty. *The cost model is a heuristic, not yet fitted to player data.*
 
-## Solve review (order-independent)
+## Solve review — where you got stuck
 
-Every board change is logged as *(time, cell, new state, source)*. After a win the log is replayed, and each action is judged against **the board as it was at that moment** — never against the solver's order, so solving in any order is fine. The review flags:
+Every board change is logged as *(time, cell, new state, source)* and replayed after a win. Your order of play is never compared with the solver's; there is **no score**. The review answers two questions:
 
-- **Wrong marks**: queens off the solution, and ✕ on a solution cell (the costliest mistake: it silently blocks later deductions), plus how long each stayed on the board.
-- **Pauses** (≥ 3× your own median gap, min 12 s), each explained by what was true right then: a wrong mark was blocking progress · an easy move (Tier 0/1) was waiting, with the cell · a genuinely hard step, with the technique (one-click drill).
-- **Redundant ✕** on cells already blocked by a queen (→ Auto Elimination) and **churn** (cells toggled 3+ times, excluding mistake fixes).
+- **Why were you stuck?** A stall is a pause ≥ 2.5× your own median gap between actions (min 10 s). For each stall the engine computes, *from the board you had at that moment*, the chain of deductions needed to reach the next queen — so eliminations you kept in your head are never held against you. The stall is labelled "immediate queen was waiting" (with the cell and reason), "chain of N deductions: A → B → C, hardest link X", or "blocked by a wrong mark". Tips say how to move faster at that kind of spot, with a one-click drill.
+- **What did mistakes cost?** Each wrong mark is time-stamped. Lost time = from the action *before* the wrong mark until the board is correct again with at least as many correct queens as before — resets included.
 
-The result is a play-quality score (A–D, 0–100), up to four concrete tips and a timeline; recent reviews also feed the advice in *My Stats*.
+Recent reviews feed *My Stats* (time-stuck share, the technique you stall on most, time lost to mistakes). Auto Elimination is never recommended: it lowers the difficulty.
+
+## Queens-only training (no ✕)
+
+Strong players keep eliminations in their head, as in Minesweeper: think, then click only the safe cell. In this mode ✕ marking (and Auto Elimination) is disabled — a click places or removes a queen. 20 levels are ordered by **chain length**, the number of deductions you must hold before the next queen is certain: from 1 step (6×6) to a 10×10 that needs 21 deductions before its first queen.
 
 ## Web Worker generation
 
@@ -85,7 +88,7 @@ Generation runs on a background thread of the player's own device (a Web Worker 
 
 ## Queen icons
 
-A dropdown next to the theme picker: **♛ Queen** (default), **✨ Theme** (follows the theme: ☀️ Sun · 🐚 Shell · 🌸 Flower · 🌙 Moon · 🪼 Jellyfish · 💎 Gem), any single icon, or **🎲 Random** (shown as `Random (current icon)`). Icons are SVG masks painted in the theme's queen colour, so they inherit each theme's palette.
+A dropdown next to the theme picker: **♛ Queen** (default), **✨ Theme** (follows the theme), any single icon, or **🎲 Random** (shown as `Random (current icon)`). One icon per theme, drawn as SVG masks in the theme's own queen colour: Daylight ☀️ sun (solid disc, short rays) · Seafoam 🐚 flat scallop shell with a wavy rim · Blossom 🌸 seven-petal sakura · Midnight ⭐ solid star with sparkles · Abyss 🔮 crystal cluster fanning out · Aubergine 💎 faceted gem.
 
 ## Saved locally
 
@@ -119,6 +122,7 @@ npm install jsdom --no-save
 node tools/gen-challenge-pool.js master 5,6,7,8,9,10 120 pool/master.jsonl 2400   # repeat per difficulty
 node tools/build-challenge-levels.js pool/      # classifies + selects 6×50 levels, patches index.html
 node tools/build-training-drills.js pool/       # 7×12 technique drills, patches index.html
+node tools/build-queens-only.js pool/          # 20 queens-only levels by chain length
 node tools/test-ui.js                           # integrity + UI flow regression
 ```
 

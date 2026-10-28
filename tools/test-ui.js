@@ -168,11 +168,32 @@ const solveNow=w=>ev(w,`for(let r=0;r<N;r++){cellState[r*N+solution[r]]=2;setCel
     if(cellState[tc]===0){act(tc,1,tm+=1);act(tc,0,tm+=1);act(tc,1,tm+=1);act(tc,0,tm+=1);}  // churn
     act(q0,2,tm+=60);                 // last queen after a 60 s pause (row 1 has one cell left → missed easy)
     checkWin();const r=SAVE.lastReview;
-    return r&&{wx:r.wx,wq:r.wq,me:r.me,rx:r.rx,ch:r.ch,sc:r.sc,g:r.grade,items:r.items.map(x=>x.k).join(','),tips:r.tips.map(x=>x.k).join(',')};})()`);
-  ok(rv&&rv.wx===1&&rv.wq===0&&rv.me>=1&&rv.ch>=1&&/rvStallWrong/.test(rv.items),'solve review: wrong ✕, stall caused by it, missed easy move, churn detected — '+JSON.stringify(rv));
+    return r&&{mk:r.mistakes.length,ep:r.episodes.map(e=>[e.start,e.end,e.w]),waste:r.waste,easy:r.missedEasy,
+      stalls:r.stalls.map(x=>x.k).join(','),tips:r.tips.map(x=>x.k).join(','),hasScore:'sc' in r};})()`);
+  ok(rv&&rv.mk===1&&rv.ep.length===1&&rv.ep[0][0]===0&&rv.ep[0][1]===45&&rv.waste===45&&/mistake/.test(rv.stalls)&&rv.easy>=1&&!rv.hasScore,
+    'solve review: mistake episode 0:00→0:45 (waste 45 s), stall blamed on it, missed immediate queen, no score — '+JSON.stringify(rv));
+  // reset during an episode counts until the same number of correct queens is back
+  const rv2=ev(w,`(()=>{loadChallengeLevel('medium',2);
+    const act=(i,st,tm)=>{timerSeconds=tm;cellState[i]=st;setCellDOM(i/N|0,i%N,st);moves++;updateStats(false);};
+    act(0*N+solution[0],2,5);act(1*N+solution[1],2,9);            // 2 correct queens
+    const bad=2*N+((solution[2]+3)%N);act(bad,2,20);                // wrong queen at t=20 (previous action t=9)
+    timerSeconds=50;restartBoard();                                  // reset at t=50
+    act(0*N+solution[0],2,60);act(1*N+solution[1],2,70);            // back to 2 correct queens at t=70
+    for(let r=2;r<N;r++)act(r*N+solution[r],2,70+r);checkWin();
+    return SAVE.lastReview.episodes.map(e=>[e.start,e.end,e.w]);})()`);
+  ok(JSON.stringify(rv2)==='[[9,70,61]]','mistake waste includes the reset: '+JSON.stringify(rv2));
   ev(w,`openReviewModal()`);
-  ok(/Key moments|关键时刻/.test(w.document.getElementById('review-body').textContent),'review modal renders');
+  ok(/Timeline|时间线/.test(w.document.getElementById('review-body').textContent),'review modal renders');
   ev(w,`closeReviewModal()`);
+
+  // ── 14. Queens-only training: ✕ disabled, 20 levels ──
+  const qo=ev(w,`(()=>{loadQueensOnly(0);const n0=N;
+    const r0=0,c0=(solution[0]+2)%N;clickCycle(r0,c0,cellState[r0*N+c0]);const placed=cellState[r0*N+c0];
+    clickCycle(r0,c0,cellState[r0*N+c0]);
+    onMouseDown(1,(solution[1]+2)%N);const dm=dragMode;forceResetDragState();
+    for(let r=0;r<N;r++){cellState[r*N+solution[r]]=2;setCellDOM(r,solution[r],2);}updateStats(false);checkWin();
+    return {levels:qoCodes().length,placed,dm,rec:!!qoRec()[0],hud:!!lastWin.qo};})()`);
+  ok(qo.levels===20&&qo.placed===2&&qo.dm==='noop'&&qo.rec&&qo.hud,'queens-only: click places a queen (no ✕), drag-marking off, clear recorded '+JSON.stringify(qo));
 
   // ── 12. Icons ──
   ev(w,`$('icon-select').value='theme';$('icon-select').dispatchEvent(new Event('change'))`);

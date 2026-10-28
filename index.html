@@ -607,6 +607,8 @@ select:hover,select:focus{border-color:var(--accent);outline:none;}
 .tr-row{display:grid;grid-template-columns:auto 1fr auto auto;gap:3px 7px;align-items:center;padding:6px 7px;margin-top:5px;
   border:1px solid var(--border);border-radius:9px;background:var(--surface2);}
 .tr-row.sel{border-color:var(--accent);}
+.qo-row{border-color:color-mix(in srgb,var(--accent) 55%,var(--border));}
+.qo-map{grid-column:1/-1;margin-top:3px;}
 .tr-tier{font-family:'DM Mono',monospace;font-size:9px;font-weight:600;color:var(--hint-c);border:1px solid currentColor;border-radius:999px;padding:1px 6px;}
 .tr-name{font-size:12px;font-weight:600;line-height:1.25;display:flex;flex-direction:column;min-width:0;}
 .tr-name small{font-family:'DM Mono',monospace;font-size:9px;font-weight:400;color:var(--text2);}
@@ -2867,7 +2869,8 @@ const DBL_MS=320;
 
 function clickCycle(r,c,originalState){
   saveUndoSnapshot();
-  const next=originalState===0||originalState===3?1:originalState===1?2:originalState===2?0:1;
+  const next=qoMode?(originalState===2?0:2)
+    :originalState===0||originalState===3?1:originalState===1?2:originalState===2?0:1;
   cellState[r*N+c]=next;moves++;
   setCellDOM(r,c,next);
   if(next===2||originalState===2)refreshAutoX();
@@ -2905,7 +2908,7 @@ function onMouseDown(r,c){
   pressStart={r,c,state:cellState[r*N+c],isTouch:false,time:Date.now(),x:lastPointer.x,y:lastPointer.y};
   pressDragging=false;dragVisited=new Set();
   const cur=cellState[r*N+c];
-  dragMode=cur===2?'noop':cur===1?'erase':'x';
+  dragMode=qoMode||cur===2?'noop':cur===1?'erase':'x';
   if(dragMode!=='noop')dragVisited.add(r*N+c);
 }
 
@@ -3022,7 +3025,7 @@ function onTouchStart(r,c){
   pressStart={r,c,state:cellState[r*N+c],isTouch:true,time:Date.now(),x:lastPointer.x,y:lastPointer.y};
   pressDragging=false;dragVisited=new Set();isDragging=false;
   const cur=cellState[r*N+c];
-  dragMode=cur===2?'noop':cur===1?'erase':'x';
+  dragMode=qoMode||cur===2?'noop':cur===1?'erase':'x';
   if(dragMode!=='noop')dragVisited.add(r*N+c);
 }
 function onTouchMove(r,c){
@@ -3361,6 +3364,7 @@ function clearHintDisplay(){
 
 function applyHint(){
   if(!activeHint||solved)return;
+  if(qoMode&&activeHint.type==='x-cells'){showToast('♛',t('qoTitle'),t('qoHintNoX'),'',3200);return;}
   _actSrc='h';
   const hint=activeHint;clearHintDisplay();
   if(hint.type==='wrong-queen-reveal'){
@@ -3649,7 +3653,7 @@ function importSeed(){
 
 // ── Event bindings ────────────────────────────────────────────────────
 const btnAutoX=$('btn-auto-x');
-btnAutoX.addEventListener('click',()=>{autoXOn=!autoXOn;btnAutoX.classList.toggle('on',autoXOn);if(autoXOn)applyAutoX();else clearAutoX();});
+btnAutoX.addEventListener('click',()=>{if(qoMode){showToast('♛',t('qoTitle'),t('qoNoX'),'',2600);return;}autoXOn=!autoXOn;btnAutoX.classList.toggle('on',autoXOn);if(autoXOn)applyAutoX();else clearAutoX();});
 btnAutoX.addEventListener('mouseenter',showAutoXPreview);
 btnAutoX.addEventListener('mouseleave',clearAutoXPreview);
 let touchHoldTimer=null;
@@ -4151,7 +4155,7 @@ const I18N={
     stNeedMore:'Solve a few more puzzles to see this.',
     advStart:'Solve at least 3 puzzles (without viewing the solution) and your evaluation appears here.',
     advHintTier:'Most of your recent hints were for <b>{name}</b> ({n}×). That is the technique blocking you — a few drills will make it automatic.',
-    advMistakes:'You place about {m} wrong queen(s) per puzzle. Place a queen only when it is forced; mark ✕ first and turn on Auto Elimination so blocked cells stay visible.',
+    advMistakes:'You place about {m} wrong queen(s) per puzzle. Place a queen only when a region, row or column is down to one cell, or after a Killer check.',
     advBigBoards:'Big boards slow you down (speed {b} on 9×9+ vs {s} on ≤7×7). Start from the smallest regions and the rows/columns with the fewest open cells, and mark ✕ as you go.',
     advImproving:'You are getting faster: speed index {a} → {b} over your last 20 solves. Keep going!',
     advSlower:'Your last 10 solves were slower ({a} → {b}). Tired, or harder boards? Try a Daily Easy to warm up.',
@@ -4162,32 +4166,43 @@ const I18N={
     advSteady:'Solid, consistent solving. Keep a steady pace and try the next difficulty when it feels easy.',
     // queen icons
     icQueen:'♛ Queen',icTheme:'✨ Theme',icRandom:'🎲 Random',
-    ic_sun:'Sun',ic_shell:'Shell',ic_flower:'Flower',ic_moon:'Moon',ic_jelly:'Jellyfish',ic_gem:'Gem',
-    // solve review
-    winReview:'🔍 Review',rvPill:'🔍 Play quality {g} · {s}/100 — open Review for move-by-move tips',
-    rvTitle:'🔍 Solve review',rvNone:'Solve a puzzle to get a move-by-move review.',
-    rvScore:'Play quality',rvMistakes:'Wrong marks',rvMissed:'Missed easy moves',rvRedundant:'Redundant ✕',rvChurn:'Toggled cells',
-    rvTipsTitle:'What would have saved you time',rvTimeline:'Key moments',rvNoEvents:'No mistakes, no long pauses — a clean solve.',
-    rvNote:'Your order of play is never judged against the solver\'s order. Each action is checked against the board as it was at that moment; each long pause (≥ 3× your usual gap, min 12 s) is checked against what was provable right then. Score = 100 − 8/wrong queen − 6/wrong ✕ − 4/missed easy move − 2/toggled cell − redundant ✕ (max −10).',
-    rvWrongQWord:'wrong queen',rvWrongXWord:'wrong ✕',
-    rvStallWrong:'Paused {d} — your board held a {what} at {c} (placed at {at}), so nothing could be proved.',
-    rvStallEasy:'Paused {d} while an easy move was available: <b>{name}</b> at {c}.',
-    rvStallHard:'Paused {d} — the next step needed <b>{name}</b> ({c}). A genuinely hard spot.',
-    rvWrongQ:'Placed a queen at {c} that is not in the solution.',rvWrongX:'Marked ✕ on {c}, which holds a queen in the solution.',
-    rvFixed:'Fixed {c} after {d}.',
-    rvTipWrongX:'A ✕ on a queen\'s cell ({c}) is the most expensive mistake: it silently blocks every later deduction. You carried wrong marks for {d} in total. Mark ✕ only when a rule proves it.',
-    rvTipWrongQ:'{n} wrong queen(s). Place a queen only when a region, row or column has a single cell left — or after a Killer check.',
-    rvTipEasy:'{n} time(s) you paused while an easy move was waiting (e.g. <b>{name}</b> at {c}). After every queen or ✕, re-scan the row, column and region it touched.',
-    rvTipHard:'Your longest real thinking spot ({d}) needed <b>{name}</b>. A few drills make it faster to spot.',
-    rvTipRedundant:'{n} of your ✕ were on cells already blocked by a queen. Auto Elimination draws those for free — save your clicks for real deductions.',
-    rvTipChurn:'{n} cell(s) were toggled 3+ times. Decide what a cell is before clicking; when unsure, leave it empty.',
-    rvTipLeaps:'You placed {n} queens straight from reasoning without marking first, and never went wrong — strong visualisation.',
-    rvTipClean:'Clean solve: no wrong marks and no missed easy moves.',
-    advScan:'You average {n} missed easy move(s) per solve: something simple was available while you paused. Build a scan routine: after each move, check its row, column and region.',
-    advWrongX:'Wrong ✕ marks ({n}/solve) are costing you the most time — they block later deductions without you noticing.',
-    advAutoX:'About {n} of your ✕ per solve are on cells already blocked by queens. Turn on Auto Elimination.',
-    advChurn:'You toggle about {n} cells back and forth per solve. Slow down the click, speed up the thinking.',
-    stDailyStreak:'Daily streak',stQuality:'Play quality',stLastReview:'🔍 Last solve review',
+    ic_sun:'Sun',ic_shell:'Shell',ic_sakura:'Sakura',ic_star:'Star',ic_crystal:'Crystals',ic_gem:'Gem',
+    // solve review (stall-focused, order-independent)
+    winReview:'🔍 Review',rvPill:'🔍 {n} stall(s), {d} stuck · mistakes cost {w} — open Review for why and how to go faster',
+    rvTitle:'🔍 Solve review',rvNone:'Solve a puzzle to get a review of where you got stuck.',
+    rvStuck:'Time stuck',rvStalls:'Stalls',rvMissed:'Missed easy queens',rvMistakes:'Wrong marks',rvWaste:'Lost to mistakes',
+    rvTipsTitle:'Why you got stuck — and how to move faster',rvTimeline:'Timeline',rvNoEvents:'No stalls and no mistakes — a smooth solve.',
+    rvNote:'Your order of play is never compared with the solver\'s. A stall is a pause ≥ 2.5× your own median gap between actions (min 10 s); it is explained by the chain of deductions the engine needed, from the board you had at that moment, to reach the next queen — so ✕ you kept in your head are not held against you. Mistake time = from the action before the wrong mark until the board was correct again with at least as many queens as before (resets included).',
+    rvStallMistake:'Stuck {d} — a wrong mark at {c} (placed {at}) was on the board, so nothing could be proved.',
+    rvStallEasy:'Stuck {d} although the next queen was immediate: {q} — {why}.',
+    rvStallChain:'Stuck {d} before the queen at {q}. From your board it took {n} deductions: {chain}. Hardest link: <b>{hard}</b>.',
+    rvEpisode:'Wrong mark {c} at {at}. Lost {w} (from {from} until the board was correct again at {to}).',
+    rvTipTech:'Most of your stuck time ({d}) was in front of <b>{name}</b>.',
+    rvTipEasy:'{n} time(s) the next queen was immediate while you paused.',
+    rvTipChain:'Your longest stall needed a {n}-step chain to reach the queen at {q}.',
+    rvTipWaste:'{n} mistake episode(s) cost {d} in total.',
+    rvTipClean:'No stalls worth noting — keep this rhythm.',
+    tipScan:'How to go faster: after every queen, look at the regions it just squeezed — start with the smallest one — then the rows/columns next to it. Forced queens appear there first.',
+    tipChain:'How to go faster: long chains are where marking pays off — or hold it region by region: finish one region\'s consequences before looking at the next. Training → Queens-only builds this muscle.',
+    tipT0:'Scan the smallest regions first; a region of 1–2 open cells is almost always where the next queen is.',
+    tipT1:'After each move, re-check the lines and regions it touched — that is where the "last cell left" appears.',
+    tipT2s:'Look for regions shaped like a strip (one row or column): they own that line.',
+    tipT2m:'Look for 2 small regions living in the same 2 rows/columns, then 3 in 3.',
+    tipT3:'Test the cells next to (or in line with) the smallest region: would a queen there wipe that region out?',
+    tipT4:'Count regions trapped inside a band of K rows: if they need all K queens, everything else in the band is out.',
+    tipT5:'Find regions that share one line and block each other elsewhere — together they must take that line.',
+    advStallTech:'Over your last {n} solves, {d} of stuck time came before <b>{name}</b> steps — that is your bottleneck.',
+    advScan:'On average {n} time(s) per solve the next queen was immediate while you paused. Build a scan routine: after each queen, check the regions it touched, smallest first.',
+    advWaste:'Mistakes cost {p}% of your solving time (from each wrong mark until the board was correct again).',
+    stStuckPct:'Time stuck',stDailyStreak:'Daily streak',stLastReview:'🔍 Last solve review',
+    // queens-only training
+    qoTitle:'Queens-only (no ✕)',qoStat:'{d}/{t} cleared · ✕ disabled',qoHud:'♛ Queens-only · Level {i}/{tot}',
+    qoBoardTitle:'{n}×{n} · Queens-only · Level {i}',
+    qoDepth:'longest chain {g} · first queen after {f} deductions',
+    qoRule:'✕ marks are disabled: click a cell to place / remove a queen. Keep every elimination in your head.',
+    qoNoX:'✕ marks and Auto Elimination are off in this mode.',qoHintNoX:'Hints explain eliminations, but you cannot place ✕ here — remember them instead.',
+    qoDone:'♛ Queens-only level {i} cleared. {d}',
+    qoLearn:'<b>Why:</b> strong players keep eliminations in their head, as in Minesweeper — think first, then click only the safe cell. <b>How:</b> ✕ is disabled; a click places or removes a queen. Levels 1→20 grow in <b>chain length</b>: how many deductions you must hold before the next queen is certain. The last levels need long chains before the first queen and are very hard.',
     aboutNote:'This game was inspired by LinkedIn\'s daily puzzle games. Its rules are the same as LinkedIn\'s Queens.',
     boardTitleSeeded:'{n}×{n} Queens Puzzle (Seeded)',boardTitleCustom:'{n}×{n} Custom Queens Puzzle',
     storageOff:'Progress can\'t be saved in this browser (storage is blocked).',
@@ -4353,7 +4368,7 @@ const I18N={
     stNeedMore:'再多解几题就能看到这里。',
     advStart:'至少解出 3 题（不查看解答），你的评估就会显示在这里。',
     advHintTier:'你最近的提示大多是 <b>{name}</b>（{n} 次）。这就是卡住你的技巧——做几道专项练习就能变成本能。',
-    advMistakes:'你平均每题放错约 {m} 个皇后。只在被逼出时才放皇后；先标 ✕，并打开「自动消除」让被封锁的格子一目了然。',
+    advMistakes:'你平均每题放错约 {m} 个皇后。只在区域/行/列只剩一格、或做过封杀检查后才放皇后。',
     advBigBoards:'大棋盘拖慢了你（9×9 以上速度 {b}，7×7 以下 {s}）。从最小的区域和可用格最少的行/列入手，边推边标 ✕。',
     advImproving:'你越来越快了：最近 20 题速度指数 {a} → {b}。继续保持！',
     advSlower:'最近 10 题变慢了（{a} → {b}）。累了，还是棋盘更难？先做一道每日简单热热身。',
@@ -4363,31 +4378,41 @@ const I18N={
     advStrong:'又快又几乎不用提示——非常出色的纯逻辑解题。',
     advSteady:'稳定扎实。保持节奏，觉得轻松时就挑战下一个难度。',
     icQueen:'♛ 皇后',icTheme:'✨ 主题',icRandom:'🎲 随机',
-    ic_sun:'太阳',ic_shell:'贝壳',ic_flower:'花朵',ic_moon:'月亮',ic_jelly:'水母',ic_gem:'宝石',
-    winReview:'🔍 复盘',rvPill:'🔍 操作质量 {g} · {s}/100 —— 打开复盘查看逐步建议',
-    rvTitle:'🔍 解题复盘',rvNone:'解出一题后即可看到逐步复盘。',
-    rvScore:'操作质量',rvMistakes:'错误标记',rvMissed:'错过的简单步',rvRedundant:'多余 ✕',rvChurn:'反复改动的格子',
-    rvTipsTitle:'哪些地方能帮你省时间',rvTimeline:'关键时刻',rvNoEvents:'没有错误、没有长时间停顿——非常干净的一局。',
-    rvNote:'不会拿你的操作顺序去和求解器的顺序比较。每一步都按当时的棋盘来判断；每次较长停顿（≥ 平时间隔的 3 倍，至少 12 秒）都检查当时能证明什么。分数 = 100 − 8×错皇后 − 6×错 ✕ − 4×错过的简单步 − 2×反复改动的格子 − 多余 ✕（最多扣 10）。',
-    rvWrongQWord:'错误的皇后',rvWrongXWord:'错误的 ✕',
-    rvStallWrong:'停顿 {d} ——棋盘上 {c} 有一个{what}（{at} 放下），所以什么都推不出来。',
-    rvStallEasy:'停顿 {d}，而此时有一步简单推理可用：<b>{name}</b>，位置 {c}。',
-    rvStallHard:'停顿 {d} ——下一步需要 <b>{name}</b>（{c}），确实是难点。',
-    rvWrongQ:'在 {c} 放了一个不属于正确解的皇后。',rvWrongX:'在 {c} 标了 ✕，但那里是正确解的皇后位置。',
-    rvFixed:'{d} 后改正了 {c}。',
-    rvTipWrongX:'把 ✕ 标在皇后位置（{c}）代价最大：它会悄悄挡住之后的每一步推理。这局错误标记总共留存了 {d}。只有规则能证明时才标 ✕。',
-    rvTipWrongQ:'放错了 {n} 个皇后。只在区域/行/列只剩一个格子、或做过封杀检查后才放皇后。',
-    rvTipEasy:'有 {n} 次你在停顿时其实有简单步可走（例如 <b>{name}</b>，{c}）。每放一个皇后或 ✕，都回扫它所在的行、列和区域。',
-    rvTipHard:'你最长的一次真正思考（{d}）需要 <b>{name}</b>。做几道专项练习能更快看出来。',
-    rvTipRedundant:'你有 {n} 个 ✕ 标在已经被皇后封锁的格子上。「自动消除」会免费画出这些——把点击留给真正的推理。',
-    rvTipChurn:'有 {n} 个格子被来回改了 3 次以上。点之前先想清楚；不确定就先空着。',
-    rvTipLeaps:'你有 {n} 个皇后是不标 ✕ 直接推理出来的，而且一个都没错——很强的盘面想象力。',
-    rvTipClean:'干净的一局：没有错误标记，也没有错过简单步。',
-    advScan:'平均每局有 {n} 次在停顿时错过了简单步。建立扫描习惯：每走一步，检查它所在的行、列和区域。',
-    advWrongX:'错误的 ✕（每局 {n} 个）最耗时间——它们会在你不察觉时挡住后续推理。',
-    advAutoX:'每局约有 {n} 个 ✕ 标在已被皇后封锁的格子上。打开「自动消除」吧。',
-    advChurn:'每局约有 {n} 个格子被来回改动。点击慢一点，思考快一点。',
-    stDailyStreak:'每日连续',stQuality:'操作质量',stLastReview:'🔍 上一局复盘',
+    ic_sun:'太阳',ic_shell:'贝壳',ic_sakura:'樱花',ic_star:'星星',ic_crystal:'水晶',ic_gem:'宝石',
+    winReview:'🔍 复盘',rvPill:'🔍 卡顿 {n} 次，共 {d} · 标错损失 {w} —— 打开复盘看原因和提速建议',
+    rvTitle:'🔍 解题复盘',rvNone:'解出一题后即可看到卡顿复盘。',
+    rvStuck:'卡顿总时长',rvStalls:'卡顿次数',rvMissed:'错过的直接皇后',rvMistakes:'标错次数',rvWaste:'标错损失',
+    rvTipsTitle:'为什么卡住——以及如何更快推进',rvTimeline:'时间线',rvNoEvents:'没有卡顿也没有标错——很顺的一局。',
+    rvNote:'不会拿你的操作顺序与求解器顺序比较。卡顿 = 两次操作间隔 ≥ 你本人中位间隔的 2.5 倍（至少 10 秒）；卡顿原因 = 从你当时的棋盘出发，到下一个皇后所需的推理链——所以你记在脑子里没标的 ✕ 不会被扣分。标错损失 = 从标错前一步，到棋盘重新回到正确、且皇后数不少于标错前的时刻（含重新开始）。',
+    rvStallMistake:'卡了 {d} ——{c} 有一个错误标记（{at} 放下），棋盘上什么都推不出来。',
+    rvStallEasy:'卡了 {d}，但下一个皇后其实是直接的：{q} ——{why}。',
+    rvStallChain:'在 {q} 的皇后之前卡了 {d}。从你当时的棋盘需要 {n} 步推理：{chain}。最难的一环：<b>{hard}</b>。',
+    rvEpisode:'{at} 在 {c} 标错。损失 {w}（从 {from} 到 {to} 棋盘重新回到正确）。',
+    rvTipTech:'你大部分卡顿时间（{d}）都卡在 <b>{name}</b> 前面。',
+    rvTipEasy:'有 {n} 次你在停顿时，下一个皇后其实是直接可放的。',
+    rvTipChain:'最长的一次卡顿需要 {n} 步推理链才能得到 {q} 的皇后。',
+    rvTipWaste:'{n} 次标错共损失 {d}。',
+    rvTipClean:'没有值得一提的卡顿——保持这个节奏。',
+    tipScan:'提速方法：每放一个皇后，先看它刚刚挤压到的区域——从最小的开始——再看相邻的行/列。被逼出的皇后通常最先出现在那里。',
+    tipChain:'提速方法：长推理链正是标记最有用的地方；或者按区域逐个推完，再看下一个。训练 → 只放皇后 专门练这种能力。',
+    tipT0:'先扫最小的区域；只剩 1–2 个可用格的区域几乎总是下一个皇后所在。',
+    tipT1:'每走一步，回看它影响到的行、列和区域——"只剩一格"就出现在那里。',
+    tipT2s:'找呈直条形（只占一行或一列）的区域：那一行/列归它。',
+    tipT2m:'找同在 2 行/2 列里的 2 个小区域，再找 3 个在 3 行里的。',
+    tipT3:'测试最小区域旁边（或同行同列）的格子：在那里放皇后会不会让该区域无格可放？',
+    tipT4:'数被困在 K 行里的区域：如果它们需要全部 K 个皇后，这几行里别的格子都要排除。',
+    tipT5:'找共享同一条线、且在线外互相冲突的几个区域——它们必然占用这条线。',
+    advStallTech:'最近 {n} 局里，有 {d} 的卡顿发生在 <b>{name}</b> 之前——这就是你的瓶颈。',
+    advScan:'平均每局有 {n} 次在停顿时下一个皇后其实是直接的。建立扫描习惯：每放一个皇后，检查它影响到的区域，从最小的开始。',
+    advWaste:'标错占用了你 {p}% 的解题时间（从标错到棋盘恢复正确）。',
+    stStuckPct:'卡顿占比',stDailyStreak:'每日连续',stLastReview:'🔍 上一局复盘',
+    qoTitle:'只放皇后（禁用 ✕）',qoStat:'已通过 {d}/{t} · 禁用 ✕',qoHud:'♛ 只放皇后 · 第 {i}/{tot} 关',
+    qoBoardTitle:'{n}×{n} · 只放皇后 · 第 {i} 关',
+    qoDepth:'最长推理链 {g} 步 · 首个皇后前需 {f} 步推理',
+    qoRule:'已禁用 ✕：点击格子放置 / 移除皇后。所有排除都要记在脑子里。',
+    qoNoX:'本模式下 ✕ 标记与自动消除均关闭。',qoHintNoX:'提示会解释排除了哪些格子，但这里不能标 ✕——请记在脑中。',
+    qoDone:'♛ 只放皇后第 {i} 关通过。{d}',
+    qoLearn:'<b>为什么：</b>高手会把排除记在脑子里，就像扫雷——先想清楚，再只点安全的格子。<b>怎么玩：</b>禁用 ✕；点击即放置或移除皇后。第 1→20 关按<b>推理链长度</b>递增：确定下一个皇后之前需要在脑中保留多少步推理。最后几关在第一个皇后之前就需要很长的推理链，非常难。',
     aboutNote:'本游戏受 LinkedIn（领英）每日益智游戏启发而制作，游戏规则与 LinkedIn 的 Queens 相同。',
     boardTitleSeeded:'{n}×{n} 皇后谜题（种子）',boardTitleCustom:'{n}×{n} 自定义皇后谜题',
     storageOff:'当前浏览器无法保存进度（本地存储被禁用）。',
@@ -4657,7 +4682,7 @@ $('diff-select').addEventListener('change',e=>{
 // stats, trophies, in-progress board). Every access is guarded: if storage is
 // blocked (private mode, sandboxed preview) the game runs from memory only.
 // ═══════════════════════════════════════════════════════════════════════
-const APP_VERSION='2026-10-27 19:12 UTC';
+const APP_VERSION='2026-10-27 23:37 UTC';
 const STORE_KEY='queensPuzzle.save.v1';
 let storageOK=true;
 function defaultSave(){
@@ -4687,6 +4712,7 @@ function loadSave(){
       pb:d.pb&&typeof d.pb==='object'?d.pb:{},
       ach:d.ach&&typeof d.ach==='object'?d.ach:{},
       train:d.train&&typeof d.train==='object'?d.train:{},
+      qo:d.qo&&typeof d.qo==='object'?d.qo:{},
       log:Array.isArray(d.log)?d.log:[],
       dailyLog:d.dailyLog&&typeof d.dailyLog==='object'?d.dailyLog:{}};
   }catch(e){storageOK=false;console.warn('Save could not be read',e);}
@@ -4832,6 +4858,7 @@ function refreshBoardTitle(){
   if(chMode)el.textContent=tf('chBoardTitle',{n:N,track:chTrackName(chMode.diff),lv:chMode.level,tot:chCodes(chMode.diff).length});
   else if(trMode)el.textContent=tf('trBoardTitle',{n:N,name:t('techN_'+trMode.tech)});
   else if(dailyMode)el.textContent=tf('dailyBoardTitle',{n:N,v:t('daily_'+dailyMode.vid)});
+  else if(qoMode)el.textContent=tf('qoBoardTitle',{n:N,i:qoMode.i+1});
   else if(curMeta.kind==='seed')el.textContent=tf('boardTitleSeeded',{n:N});
   else if(curMeta.kind==='custom')el.textContent=tf('boardTitleCustom',{n:N});
   else el.textContent=tf('boardTitleFmt',{n:N});
@@ -4841,7 +4868,7 @@ function refreshBoardTitle(){
 function loadFixedPuzzle(p){
   cancelGeneration();                    // stop any generation still running
   if(editMode)exitEditMode();
-  chMode=null;trMode=null;dailyMode=null;
+  chMode=null;trMode=null;dailyMode=null;qoMode=null;
   stopTimer();
   $('loading').style.display='none';$('board-wrapper').style.display='inline-grid';
   $('stats-strip').style.display='flex';$('win-banner').classList.remove('show');
@@ -4878,8 +4905,8 @@ function loadChallengeLevel(diff,level){
   if(chIsBoss(level))showToast('👑',t('chBossKicker'),tf('chBossName',{n:level}),t('chBossDesc'),3200);
 }
 function chExit(){
-  const had=chMode||trMode||dailyMode||SAVE.prefs.lastCh;
-  chMode=null;trMode=null;dailyMode=null;
+  const had=chMode||trMode||dailyMode||qoMode||SAVE.prefs.lastCh;
+  chMode=null;trMode=null;dailyMode=null;qoMode=null;
   if(!had)return;
   SAVE.prefs.lastCh=null;persist();
   updateChHud();renderChPanel();
@@ -4947,6 +4974,7 @@ function updateChHud(){
   const hud=$('ch-hud');if(!hud)return;
   if(!editMode&&!chMode&&trMode)return renderTrHud(hud);
   if(!editMode&&!chMode&&dailyMode)return renderDailyHud(hud);
+  if(!editMode&&!chMode&&qoMode)return renderQoHud(hud);
   if(!chMode||editMode){hud.style.display='none';hud.innerHTML='';return;}
   const {diff,level}=chMode,boss=chIsBoss(level);
   const par=chPar(diff,N,boss),rec=chTrack(diff).lv[level];
@@ -5018,6 +5046,11 @@ function onSolved(){
       const left=DAILY_VARIANTS.filter(v=>!(dailyLog()[dailyMode.date]||{})[v.id]).map(v=>t('daily_'+v.id));
       w.daily={v:dailyMode.vid,left};
     }
+    else if(qoMode){
+      const L=qoRec(),prev=L[qoMode.i],tot=qoCodes().length;
+      if(!assist.sol&&(!prev||timerSeconds<prev.t))L[qoMode.i]={t:timerSeconds,wq:assist.mis||0};
+      w.qo={i:qoMode.i,next:qoMode.i+1<tot?qoMode.i+1:null,first:!prev,sol:assist.sol};
+    }
     else if(!assist.sol)w.pb=recordFreePB();
     w.ach=checkAchievements();
     const after=rankFor(progressSummary().stars);
@@ -5038,12 +5071,17 @@ function onSolved(){
 function renderWinCard(w,animate){
   lastWin=w;
   const card=document.querySelector('.win-card'),ch=w.ch;
+  if(w.qo){
+    $('win-btns-ch').style.display='';$('win-btns-free').style.display='none';
+    $('win-ch-next').textContent=w.qo.next!=null?t('chNext'):t('trTitle');$('win-ch-next').disabled=false;
+    $('win-ch-retry').textContent=t('chRetry');$('win-ch-map').textContent=t('trTitle');
+  }
   card.classList.toggle('ch-win',!!ch);
   card.classList.toggle('boss-win',!!(ch&&ch.boss));
   $('win-title').textContent=ch?(ch.boss?t('chBossWin'):t('chLevelClear')):t('winTitle');
   $('win-ch').style.display=ch?'':'none';
-  $('win-btns-ch').style.display=ch?'':'none';
-  $('win-btns-free').style.display=ch?'none':'';
+  $('win-btns-ch').style.display=ch||w.qo?'':'none';
+  $('win-btns-free').style.display=ch||w.qo?'none':'';
   $('win-msg').style.display=ch?'none':'';
   const pills=[];
   if(ch){
@@ -5073,7 +5111,8 @@ function renderWinCard(w,animate){
       ?tf('pbFirst',{n:w.pb.n,d:w.pb.d,time:fmtTime(w.pb.sec)})
       :tf('pbNew',{n:w.pb.n,d:w.pb.d,prev:fmtTime(w.pb.prev)})}</div>`);
   }
-  if(w.rv)pills.push(`<div class="win-pill">${tf('rvPill',{g:w.rv.grade,s:w.rv.sc})}</div>`);
+  if(w.rv)pills.push(`<div class="win-pill">${tf('rvPill',{n:w.rv.stalls.length,d:fmtTime(w.rv.stallTime),w:fmtTime(w.rv.waste)})}</div>`);
+  if(w.qo)pills.push(`<div class="win-pill">${tf('qoDone',{i:w.qo.i+1,d:qoDepthText(w.qo.i)})}</div>`);
   if(w.daily)pills.push(`<div class="win-pill">${tf('dailyDone',{v:t('daily_'+w.daily.v)})}${w.daily.left.length?' '+tf('dailyLeft',{l:w.daily.left.join(' / ')}):' '+t('dailyAllDone')}</div>`);
   if(w.rankUp)pills.push(`<div class="win-pill rank">${tf('chRankUp',{ic:w.rankUp.ic,name:t(w.rankUp.k)})}</div>`);
   if(w.ach.length)pills.push(`<div class="win-pill">${w.ach.map(a=>a.ic).join(' ')} ${t('achKicker')}: <b>${w.ach.map(a=>t('achN_'+a.id)).join(', ')}</b></div>`);
@@ -5155,7 +5194,7 @@ function saveResume(){
     if(editMode||!regions.length||$('board-wrapper').style.display==='none')return;
     if(solved||trMode){if(SAVE.resume){SAVE.resume=null;persist();}return;}
     SAVE.resume={n:N,r:Array.from(regions),s:Array.from(solution),cs:Array.from(cellState),
-      mv:moves,tm:timerSeconds,ax:autoXOn,meta:curMeta,ch:chMode,dy:dailyMode,as:assist};
+      mv:moves,tm:timerSeconds,ax:autoXOn,meta:curMeta,ch:chMode,dy:dailyMode,qo:qoMode,as:assist};
     persist();
   }catch(e){}
 }
@@ -5169,6 +5208,7 @@ function restoreResume(){
   loadFixedPuzzle({n,regions:R.r,solution:R.s,diff:meta.diff||'medium',kind:meta.kind||'gen'});
   if(R.ch&&CH_TRACKS.includes(R.ch.diff)&&R.ch.level>=1&&R.ch.level<=chCodes(R.ch.diff).length)chMode={diff:R.ch.diff,level:R.ch.level};
   if(R.dy&&R.dy.date===todayKey()&&DAILY_VARIANTS.some(v=>v.id===R.dy.vid))dailyMode={date:R.dy.date,vid:R.dy.vid};
+  if(R.qo&&R.qo.i>=0&&R.qo.i<qoCodes().length)qoMode={i:R.qo.i,depth:qoDepth()};
   if(Array.isArray(R.cs)&&R.cs.length===N*N){
     cellState=R.cs.map(v=>(v===1||v===2||v===3)?v:0);
     for(let r=0;r<N;r++)for(let c=0;c<N;c++)setCellDOM(r,c,cellState[r*N+c]);
@@ -5217,6 +5257,8 @@ $('ch-map').addEventListener('click',e=>{
   loadChallengeLevel(SAVE.prefs.chTrack,+b.dataset.lv);
 });
 $('ch-hud').addEventListener('click',e=>{
+  const qn=e.target.closest('[data-qo]');
+  if(qn&&qoMode&&!qn.disabled){loadQueensOnly(qoMode.i+(+qn.dataset.qo));return;}
   const tb=e.target.closest('[data-tr]');
   if(tb&&trMode){({check:trCheck,reveal:trReveal,next:trNext})[tb.dataset.tr]();return;}
   const b=e.target.closest('[data-nav]');if(!b||b.disabled||!chMode)return;
@@ -5233,12 +5275,16 @@ $('ach-reset').addEventListener('click',()=>{
   persist();renderAchModal();renderChPanel();updateChHud();
 });
 $('win-ch-next').addEventListener('click',()=>{
+  if(lastWin&&lastWin.qo){const q=lastWin.qo;if(q.next!=null)loadQueensOnly(q.next);else{$('win-banner').classList.remove('show');SAVE.prefs.modeTab='train';renderModePanel();}return;}
   const w=lastWin&&lastWin.ch;if(!w)return;
   if(w.next){loadChallengeLevel(w.diff,w.next);}
   else{$('win-banner').classList.remove('show');toggleChMap(true);$('ch-panel').scrollIntoView({behavior:'smooth',block:'nearest'});}
 });
-$('win-ch-retry').addEventListener('click',()=>{const w=lastWin&&lastWin.ch;if(w)loadChallengeLevel(w.diff,w.level);});
+$('win-ch-retry').addEventListener('click',()=>{
+  if(lastWin&&lastWin.qo)return loadQueensOnly(lastWin.qo.i);
+  const w=lastWin&&lastWin.ch;if(w)loadChallengeLevel(w.diff,w.level);});
 $('win-ch-map').addEventListener('click',()=>{
+  if(lastWin&&lastWin.qo){$('win-banner').classList.remove('show');SAVE.prefs.modeTab='train';renderModePanel();$('ch-panel').scrollIntoView({behavior:'smooth',block:'nearest'});return;}
   $('win-banner').classList.remove('show');toggleChMap(true);
   $('ch-panel').scrollIntoView({behavior:'smooth',block:'nearest'});
 });
@@ -5415,9 +5461,8 @@ function loadDrill(tech,i){
     if(s.type==='queen')cellState[s.row*N+s.col]=2;
     else(s.cells||[]).forEach(([r,c])=>{if(cellState[r*N+c]!==2)cellState[r*N+c]=1;});
   }
-  autoXOn=true;$('btn-auto-x').classList.add('on');
+  autoXOn=false;$('btn-auto-x').classList.remove('on');
   for(let r=0;r<N;r++)for(let c=0;c<N;c++)setCellDOM(r,c,cellState[r*N+c]);
-  applyAutoX();
   _wrongPrev=new Set();resetActionLog();
   const {hints}=collectAllHintsAtBestTier();
   const valid=hints.filter(h=>techOfStep(h)===tech);
@@ -5470,7 +5515,7 @@ function trCheck(){
   if([...U].some(isSol))return trFeedback('bad',t('trXOnQueen'));
   const all=new Set();trMode.valid.forEach(v=>v.cells.forEach(([r,c])=>all.add(r*N+c)));
   const full=trMode.valid.find(v=>v.cells.every(([r,c])=>U.has(r*N+c)));
-  const extra=[...U].filter(i=>!all.has(i)).length;
+  const extra=[...U].filter(i=>!all.has(i)&&!blockedByQueen(S,i)).length;
   if(full&&!extra)return trSuccess(full);
   if(full)return trFeedback('warn',tf('trExtra',{n:extra}));
   let bestOv=0,bestMiss=0;
@@ -5506,7 +5551,7 @@ function renderTrHud(hud){
 function renderTrainPane(){
   const pane=$('train-pane');if(!pane)return;
   const sel=SAVE.prefs.trTech||'t0';
-  let h=`<p class="pane-intro">${t('trIntro')}</p>`;
+  let h=renderQoSection()+`<p class="pane-intro">${t('trIntro')}</p>`;
   for(const tech of TECHS){
     const s=trSummary(tech.id);
     const r=trRec(tech.id).r;
@@ -5523,6 +5568,50 @@ function renderTrainPane(){
     </div>`;
   }
   pane.innerHTML=h;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// QUEENS-ONLY TRAINING — full boards with ✕ marking disabled: every
+// elimination stays in your head (like Minesweeper: think, then only click
+// the safe cell). 20 levels ordered by chain length between queens; built by
+// tools/build-queens-only.js.
+// ═══════════════════════════════════════════════════════════════════════
+const QO_DATA=/*QO_DATA_BEGIN*/'6111100110102110002333222433333444553415203,a25000011112555444441255544444422555443345555444444555544464455554446445577446664887744444488999444445908627314,8000000000010000020110000211130002433333024446355247766654447777562041753,a00000022221114400222331440222234144002224444422222444445522244444522264444555726884455779688888579994260359718,6000000100030102333112223142223445523402513,6111001111111111212331222344422355522425031,8000000551444445512244455112243354444455544444545666744457777445550264713,9333000008330010888230314888233334888236344888336664558333664888773444888733888888640257318,5332203122031122322224444441302,8333001113300115133255555332555556444455766665577667777777777777747203516,700000040010244531124453122245666644556666466666665241603,9022222233000021113555522213555422213544442222554472766577477768577476668777778888064831725,5111003142031420314243344441302,8031111110333114122231141255331442253444472534466755544467777666605146273,9200000011203304011223304551333404555334444455444845555778844566778844544788884444570246813,5100001220311233144434433330241,5410004133341322413324222231420,700000330102003012203301123334445333664555466444444136250,700023110022331222233123322332433335644553566445552635140,a11111100001111213600142221366644233333364444444436544443333654544446665555547778444444477849999888887135208694'/*QO_DATA_END*/;
+let qoMode=null;   // {i,depth}
+function qoCodes(){return QO_DATA.split(',').filter(Boolean);}
+function qoRec(){if(!SAVE.qo||typeof SAVE.qo!=='object')SAVE.qo={};return SAVE.qo;}
+function qoDepth(){
+  let gap=0,run=0,delay=-1;
+  solutionSteps.forEach(s=>{if(s.type==='queen'){if(delay<0)delay=run;gap=Math.max(gap,run);run=0;}else run++;});
+  return{gap,delay:Math.max(0,delay)};
+}
+function qoDepthText(){return qoMode?tf('qoDepth',{g:qoMode.depth.gap,f:qoMode.depth.delay}):'';}
+function loadQueensOnly(i){
+  const codes=qoCodes();if(!codes.length)return;
+  i=Math.max(0,Math.min(codes.length-1,i|0));
+  const p=chDecode(codes[i]);
+  loadFixedPuzzle({n:p.n,regions:p.regions,solution:p.solution,diff:'training',kind:'qonly'});
+  qoMode={i,depth:qoDepth()};
+  SAVE.prefs.modeTab='train';persist();
+  refreshBoardTitle();updateChHud();renderModePanel();saveResume();
+}
+function renderQoHud(hud){
+  const tot=qoCodes().length,r=qoRec()[qoMode.i];
+  hud.innerHTML=`<span class="tr-tag">${tf('qoHud',{i:qoMode.i+1,tot})}</span>`+
+    `<span>${qoDepthText()}</span><span>${t('hudHints')} <b>${assist.hints}</b></span>`+
+    `<span>${t('hudBest')} <b>${r?fmtTime(r.t):'—'}</b></span>`+
+    `<span class="hud-nav"><button type="button" data-qo="-1"${qoMode.i<=0?' disabled':''}>${t('hudPrev')}</button>`+
+    `<button type="button" data-qo="1"${qoMode.i>=tot-1?' disabled':''}>${t('hudNext')}</button></span>`+
+    `<div class="tr-fb warn">${t('qoRule')}</div>`;
+  hud.style.display='flex';
+}
+function renderQoSection(){
+  const codes=qoCodes(),L=qoRec();
+  const cells=codes.map((c,j)=>{const r=L[j],n=c[0]==='a'?10:+c[0],cur=qoMode&&qoMode.i===j;
+    return `<button class="ch-lv${r?' cleared':''}${cur?' cur':''}" data-qolv="${j}" title="${tf('chLvTip',{lv:j+1,n})}${r?' · '+fmtTime(r.t):''}">${j+1}<span class="lv-st">${r?'✓':''}</span></button>`;}).join('');
+  return `<div class="tr-row qo-row"><span class="tr-tier">♛</span><span class="tr-name">${t('qoTitle')}<small>${tf('qoStat',{d:Object.keys(L).length,t:codes.length})}</small></span>
+    <button class="tr-learn-btn" data-learn="qo" title="${t('trLearn')}">?</button><button class="tr-go" data-qogo="1">▶</button>
+    <div class="ch-map qo-map">${cells}</div>${trLearnOpen==='qo'?`<div class="tr-learn">${t('qoLearn')}</div>`:''}</div>`;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -5648,8 +5737,8 @@ function logSolve(){
   SAVE.log.push({d:Date.now(),k:curMeta.kind,df:curMeta.diff,n:N,t:timerSeconds,mv:moves,
     h:assist.hints,ht:(assist.ht||[]).slice(0,20),mis:assist.mis||0,sol:!!assist.sol,
     xt:expectedSeconds(N,solutionSteps),
-    rv:SAVE.lastReview?{sc:SAVE.lastReview.sc,wq:SAVE.lastReview.wq,wx:SAVE.lastReview.wx,me:SAVE.lastReview.me,
-      hs:SAVE.lastReview.hs,rx:SAVE.lastReview.rx,ch:SAVE.lastReview.ch}:null});
+    rv:SAVE.lastReview?{st:SAVE.lastReview.stallTime,me:SAVE.lastReview.missedEasy,w:SAVE.lastReview.waste,
+      mk:SAVE.lastReview.mistakes.length,bt:SAVE.lastReview.byTech}:null});
   if(SAVE.log.length>400)SAVE.log.splice(0,SAVE.log.length-400);
 }
 const speedIdx=e=>Math.min(300,Math.round(100*e.xt/Math.max(5,e.t)));
@@ -5700,15 +5789,17 @@ function evaluatePlayer(){
     const untried=(need||[]).find(id=>trSummary(id).done===0);
     if(untried)A('advTryTech',{name:t('techN_'+untried)},untried);
   }
-  // 7. habits seen in the move-by-move reviews (order-independent)
-  const rvs=recent.map(e=>e.rv).filter(Boolean);
+  // 7. where the stuck time goes (from the move-by-move reviews, order-independent)
+  const rvs=recent.filter(e=>e.rv&&e.rv.bt!==undefined);
   if(rvs.length>=3){
-    const m=k=>avg(rvs.map(r=>r[k]||0));
-    ev.quality=Math.round(m('sc'));
-    if(m('me')>=0.5)A('advScan',{n:m('me').toFixed(1)},'t1');
-    if(m('wx')>=0.3)A('advWrongX',{n:m('wx').toFixed(1)});
-    if(m('rx')>=5)A('advAutoX',{n:Math.round(m('rx'))});
-    if(m('ch')>=2)A('advChurn',{n:m('ch').toFixed(1)});
+    const totT=rvs.reduce((a,e)=>a+e.t,0)||1;
+    ev.stuckPct=Math.round(100*rvs.reduce((a,e)=>a+(e.rv.st||0),0)/totT);
+    const bt={};rvs.forEach(e=>{for(const k in e.rv.bt)bt[k]=(bt[k]||0)+e.rv.bt[k];});
+    const top=Object.entries(bt).sort((a,b)=>b[1]-a[1])[0];
+    if(top&&top[1]>=30)A('advStallTech',{name:t('techN_'+top[0]),d:fmtTime(top[1]),n:rvs.length},top[0]);
+    if(avg(rvs.map(e=>e.rv.me||0))>=0.5)A('advScan',{n:avg(rvs.map(e=>e.rv.me||0)).toFixed(1)},'t1');
+    const wPct=Math.round(100*rvs.reduce((a,e)=>a+(e.rv.w||0),0)/totT);
+    if(wPct>=10)A('advWaste',{p:wPct});
   }
   // 8. no hints at all and fast → keep it up
   if(ev.hintRate!=null&&ev.hintRate<0.2&&ev.si!=null&&ev.si>=110)A('advStrong');
@@ -5737,7 +5828,7 @@ function renderStatsModal(){
   let h=`<div class="ach-stats">`+
     tile(clean.length,'stSolved')+
     tile(ev.si==null?'—':Math.round(ev.si),'stSpeed',band?t(band):'')+
-    tile(ev.quality==null?'—':ev.quality,'stQuality')+
+    tile(ev.stuckPct==null?'—':ev.stuckPct+'%','stStuckPct')+
     tile(ev.hintRate==null?'—':ev.hintRate.toFixed(1),'stHintRate')+
     tile(ev.misRate==null?'—':ev.misRate.toFixed(1),'stMisRate')+
     tile(fmtTime(tot).replace(/^(\d+):/,(m,a)=>a>=60?Math.floor(a/60)+'h'+String(a%60).padStart(2,'0')+':':m),'stTotalTime')+
@@ -5773,21 +5864,21 @@ function closeStatsModal(){$('stats-modal').style.display='none';}
 // ═══════════════════════════════════════════════════════════════════════
 // shape = painted area, cut = details punched out of it (both on a 24×24 grid)
 const QICONS={
-  // Daylight — sun
-  sun:{shape:'<circle cx="12" cy="12" r="5"/><path stroke-width="2.2" stroke-linecap="round" fill="none" d="M12 1.8v3M12 19.2v3M1.8 12h3M19.2 12h3M4.8 4.8l2.1 2.1M17.1 17.1l2.1 2.1M4.8 19.2l2.1-2.1M17.1 6.9l2.1-2.1"/>',cut:'<circle cx="12" cy="12" r="2.6" fill="none" stroke-width="1"/>'},
-  // Seafoam — scallop shell
-  shell:{shape:'<path d="M12 3C6.6 3 2.6 7.4 3.1 12.4c.2 2 1.4 3.6 3 4.4l1.3 2.6h9.2l1.3-2.6c1.6-.8 2.8-2.4 3-4.4C21.4 7.4 17.4 3 12 3z"/><path d="M9.5 20.2h5l-.6 1.6h-3.8z"/>',cut:'<path stroke-width="1.1" stroke-linecap="round" fill="none" d="M12 5.5v12M8.4 6.4l2.2 11M15.6 6.4l-2.2 11M5.6 9l4 8.6M18.4 9l-4 8.6"/>'},
-  // Blossom — five-petal flower
-  flower:{shape:'<ellipse cx="12" cy="6.4" rx="3.9" ry="4.3"/><ellipse cx="12" cy="6.4" rx="3.9" ry="4.3" transform="rotate(72 12 12)"/><ellipse cx="12" cy="6.4" rx="3.9" ry="4.3" transform="rotate(144 12 12)"/><ellipse cx="12" cy="6.4" rx="3.9" ry="4.3" transform="rotate(216 12 12)"/><ellipse cx="12" cy="6.4" rx="3.9" ry="4.3" transform="rotate(288 12 12)"/>',cut:'<circle cx="12" cy="12" r="2.3" fill="none" stroke-width="1.3"/>'},
-  // Midnight — crescent moon with a star
-  moon:{shape:'<path d="M14.5 2.6A9.6 9.6 0 1 0 21.4 15 7.6 7.6 0 1 1 14.5 2.6z"/><path d="M18.6 3.2l.8 1.7 1.8.3-1.3 1.3.3 1.8-1.6-.9-1.6.9.3-1.8-1.3-1.3 1.8-.3z"/>',cut:'<circle cx="7.6" cy="13.4" r="1.2"/><circle cx="10.6" cy="18" r=".8"/>'},
-  // Abyss — jellyfish
-  jelly:{shape:'<path d="M3.2 12.2C3.2 6.8 7.2 3 12 3s8.8 3.8 8.8 9.2c0 .9-.6 1.4-1.4 1.4H4.6c-.8 0-1.4-.5-1.4-1.4z"/><path stroke-width="1.6" stroke-linecap="round" fill="none" d="M6.5 14.4c-.8 2 .8 3-.2 5.2M10 14.4c-.8 2.4 1 3.6 0 6.4M14 14.4c.8 2.4-1 3.6 0 6.4M17.5 14.4c.8 2-.8 3 .2 5.2"/>',cut:'<circle cx="9" cy="9.2" r="1.1"/><circle cx="12.4" cy="7.6" r=".8"/><path stroke-width=".9" fill="none" d="M5 11.6h14"/>'},
+  // Daylight — sun: solid disc, short rays
+  sun:{shape:'<circle cx="12" cy="12" r="6.3"/><path stroke-width="1.9" stroke-linecap="round" fill="none" d="M20.3 12L22.6 12M17.87 17.87L19.5 19.5M12 20.3L12 22.6M6.13 17.87L4.5 19.5M3.7 12L1.4 12M6.13 6.13L4.5 4.5M12 3.7L12 1.4M17.87 6.13L19.5 4.5"/>',cut:''},
+  // Seafoam — flat scallop with a wavy rim
+  shell:{shape:'<path d="M1.4 15.2Q-0.09 12.86 2.45 11.3Q2.3 8.63 5.39 8.16Q6.62 5.71 9.64 6.43Q12 4.67 14.36 6.43Q17.38 5.71 18.61 8.16Q21.7 8.63 21.55 11.3Q24.09 12.86 22.6 15.2L14.6 18.8L9.4 18.8Z"/><path d="M8.6 17.9h6.8l-.9 2.6H9.5z"/>',cut:'<path stroke-width=".95" stroke-linecap="round" fill="none" d="M12 18.4L3.79 12.29M12 18.4L6.32 9.6M12 18.4L9.97 8.1M12 18.4L14.03 8.1M12 18.4L17.68 9.6M12 18.4L20.21 12.29"/><path stroke-width=".8" fill="none" d="M8.4 17.9h7.2"/>'},
+  // Blossom — seven-petal sakura
+  sakura:{shape:'<path transform="rotate(0 12 12) translate(12 0) scale(.95 1) translate(-12 0)" d="M12 11.6C9.2 9.6 8.2 6 9.4 3.3l1.5.4 1.1 1.5 1.1-1.5 1.5-.4c1.2 2.7.2 6.3-2.6 8.3z"/><path transform="rotate(51.43 12 12) translate(12 0) scale(.95 1) translate(-12 0)" d="M12 11.6C9.2 9.6 8.2 6 9.4 3.3l1.5.4 1.1 1.5 1.1-1.5 1.5-.4c1.2 2.7.2 6.3-2.6 8.3z"/><path transform="rotate(102.86 12 12) translate(12 0) scale(.95 1) translate(-12 0)" d="M12 11.6C9.2 9.6 8.2 6 9.4 3.3l1.5.4 1.1 1.5 1.1-1.5 1.5-.4c1.2 2.7.2 6.3-2.6 8.3z"/><path transform="rotate(154.29 12 12) translate(12 0) scale(.95 1) translate(-12 0)" d="M12 11.6C9.2 9.6 8.2 6 9.4 3.3l1.5.4 1.1 1.5 1.1-1.5 1.5-.4c1.2 2.7.2 6.3-2.6 8.3z"/><path transform="rotate(205.71 12 12) translate(12 0) scale(.95 1) translate(-12 0)" d="M12 11.6C9.2 9.6 8.2 6 9.4 3.3l1.5.4 1.1 1.5 1.1-1.5 1.5-.4c1.2 2.7.2 6.3-2.6 8.3z"/><path transform="rotate(257.14 12 12) translate(12 0) scale(.95 1) translate(-12 0)" d="M12 11.6C9.2 9.6 8.2 6 9.4 3.3l1.5.4 1.1 1.5 1.1-1.5 1.5-.4c1.2 2.7.2 6.3-2.6 8.3z"/><path transform="rotate(308.57 12 12) translate(12 0) scale(.95 1) translate(-12 0)" d="M12 11.6C9.2 9.6 8.2 6 9.4 3.3l1.5.4 1.1 1.5 1.1-1.5 1.5-.4c1.2 2.7.2 6.3-2.6 8.3z"/>',cut:'<circle cx="12" cy="12" r="1.15"/><path transform="rotate(0 12 12)" stroke-width=".65" stroke-linecap="round" fill="none" d="M12 10.3V7.9"/><path transform="rotate(51.43 12 12)" stroke-width=".65" stroke-linecap="round" fill="none" d="M12 10.3V7.9"/><path transform="rotate(102.86 12 12)" stroke-width=".65" stroke-linecap="round" fill="none" d="M12 10.3V7.9"/><path transform="rotate(154.29 12 12)" stroke-width=".65" stroke-linecap="round" fill="none" d="M12 10.3V7.9"/><path transform="rotate(205.71 12 12)" stroke-width=".65" stroke-linecap="round" fill="none" d="M12 10.3V7.9"/><path transform="rotate(257.14 12 12)" stroke-width=".65" stroke-linecap="round" fill="none" d="M12 10.3V7.9"/><path transform="rotate(308.57 12 12)" stroke-width=".65" stroke-linecap="round" fill="none" d="M12 10.3V7.9"/>'},
+  // Midnight — solid star with sparkles
+  star:{shape:'<path stroke-width="1.8" stroke-linejoin="round" d="M11 4.2l2.1 4.9 5.3.5-4 3.6 1.2 5.2L11 15.6l-4.6 2.8 1.2-5.2-4-3.6 5.3-.5z"/><path d="M19.4 14.2l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8zM18.6 1.8l.6 1.5 1.5.6-1.5.6-.6 1.5-.6-1.5-1.5-.6 1.5-.6zM4.2 18.8l.5 1.3 1.3.5-1.3.5-.5 1.3-.5-1.3-1.3-.5 1.3-.5z"/>',cut:''},
+  // Abyss — crystal cluster fanning out
+  crystal:{shape:'<path transform="rotate(-4 12 21.6)" d="M9.5 21.6V8.6L12 2.6l2.5 6v13z"/><path transform="rotate(-27 8.2 21.6)" d="M5.7 21.6v-8.6l2.5-4.2 2.5 4.2v8.6z"/><path transform="rotate(25 15.8 21.6)" d="M13.2 21.6v-9.9l2.6-4.4 2.6 4.4v9.9z"/><path d="M4.2 21.2c2.4-1 13.2-1 15.6 0 .6.3.4 1.2-.3 1.2H4.5c-.7 0-.9-.9-.3-1.2z"/>',cut:'<path transform="rotate(-4 12 21.6)" stroke-width=".7" fill="none" d="M12 3.8v16.6"/><path transform="rotate(-27 8.2 21.6)" stroke-width=".7" fill="none" d="M8.2 10.4v10.4"/><path transform="rotate(25 15.8 21.6)" stroke-width=".7" fill="none" d="M15.8 8.8v11.8"/><path stroke-width=".9" fill="none" d="M3.6 20.6h16.8"/>'},
   // Aubergine — faceted gem
   gem:{shape:'<path d="M6.4 3.5h11.2L22 9.2 12 21 2 9.2z"/>',cut:'<path stroke-width="1" fill="none" stroke-linejoin="round" d="M2.6 9.2h18.8M8.2 9.2 12 20M15.8 9.2 12 20M6.4 3.6l1.8 5.6L12 3.8l3.8 5.4 1.8-5.6"/>'},
 };
-const QICON_EMOJI={sun:'☀️',shell:'🐚',flower:'🌸',moon:'🌙',jelly:'🪼',gem:'💎'};
-const THEME_QICON={light1:'sun',light2:'shell',light3:'flower',dark1:'moon',dark2:'jelly',dark3:'gem'};
+const QICON_EMOJI={sun:'☀️',shell:'🐚',sakura:'🌸',star:'⭐',crystal:'🔮',gem:'💎'};
+const THEME_QICON={light1:'sun',light2:'shell',light3:'sakura',dark1:'star',dark2:'crystal',dark3:'gem'};
 let iconPref='queen';       // 'queen' | 'theme' | 'random' | one of QICONS
 let iconRandom=null;
 function qiconURL(id){
@@ -5837,6 +5928,9 @@ document.querySelector('.mode-tabs').addEventListener('click',e=>{
   if(b.dataset.tab==='daily')ensureDaily();
 });
 $('train-pane').addEventListener('click',e=>{
+  const qb=e.target.closest('[data-qolv]');
+  if(qb){loadQueensOnly(+qb.dataset.qolv);return;}
+  if(e.target.closest('[data-qogo]')){const L=qoRec(),tot=qoCodes().length;let j=0;while(j<tot&&L[j])j++;loadQueensOnly(j>=tot?0:j);return;}
   const l=e.target.closest('[data-learn]');
   if(l){trLearnOpen=trLearnOpen===l.dataset.learn?null:l.dataset.learn;SAVE.prefs.trTech=l.dataset.learn;persist();renderTrainPane();return;}
   const g=e.target.closest('[data-go]');
@@ -5900,88 +5994,98 @@ function forcedNow(S,i){
   for(let j=0;j<N*N;j++){if(!open(j))continue;if(regions[j]===regions[i])reg++;if((j/N|0)===r)row++;if(j%N===c)col++;}
   return reg===1||row===1||col===1;
 }
+// The deductions the engine needs, from board S, until it can place the next
+// queen. This is "why you were stuck": it ignores whether you marked ✕ or kept
+// them in your head — it starts from what was provable on the visible board.
+function chainToNextQueen(S){
+  const sim=Int8Array.from(S),chain=[];
+  for(let k=0;k<N*N;k++){
+    let h=null;try{h=getNextHintForState(N,regions,sim);}catch(_){}
+    if(!h||(h.tier||0)>=7)return null;
+    chain.push(h);
+    if(h.type==='queen')return chain;
+    (h.cells||[]).forEach(([r,c])=>{if(sim[r*N+c]!==2)sim[r*N+c]=1;});
+  }
+  return null;
+}
+const TECH_TIP={t0:'tipT0',t1:'tipT1',t2s:'tipT2s',t2m:'tipT2m',t3:'tipT3',t4:'tipT4',t5:'tipT5'};
 function analyzeSolveReview(){
   const al=(assist.al||[]).slice();
   const S=new Int8Array(N*N);
-  const isSolCell=i=>solution[i/N|0]===i%N;
-  const rv={sc:100,wq:0,wx:0,rx:0,ch:0,me:0,hs:0,lp:0,undo:0,carry:0,items:[],tips:[]};
-  const openWrong=new Map();               // cell → {t,kind}
-  const touches=new Map();
-  // pause threshold: 3× the median gap, at least 12 s
-  const gaps=[];let prevT=0;
-  for(const e of al){gaps.push(e[0]-prevT);prevT=e[0];}
-  const med=gaps.length?gaps.slice().sort((a,b)=>a-b)[Math.floor(gaps.length/2)]:0;
-  const stallMin=Math.max(12,med*3);
-  prevT=0;
+  const isSol=i=>solution[i/N|0]===i%N;
+  const wrongCount=()=>{let w=0;for(let i=0;i<N*N;i++)if((S[i]===2&&!isSol(i))||(S[i]===1&&isSol(i)))w++;return w;};
+  const goodQueens=()=>{let q=0;for(let i=0;i<N*N;i++)if(S[i]===2&&isSol(i))q++;return q;};
+  const rv={stalls:[],mistakes:[],episodes:[],stallTime:0,waste:0,missedEasy:0,byTech:{},time:timerSeconds,n:N,when:Date.now()};
+  // Pause threshold: 2.5× your own median gap between actions, at least 10 s
+  const gaps=[];let pt=0;for(const e of al){if(e[0]>pt)gaps.push(e[0]-pt);pt=e[0];}
+  const med=gaps.length?gaps.slice().sort((x,y)=>x-y)[Math.floor(gaps.length/2)]:0;
+  const stallMin=Math.max(10,Math.round(med*2.5));
+  let prevT=0,ep=null;   // ep = open mistake episode {start,q0,marks:[]}
+  const pushStall=(start,dur,before)=>{
+    if(ep){rv.stalls.push({t:start,d:dur,k:'mistake',c:cellLbl(ep.marks[0].i),at:ep.marks[0].t});return;}
+    const ch=chainToNextQueen(before);if(!ch)return;
+    const q=ch[ch.length-1],techs=ch.map(h=>techOfStep(h)||('t'+Math.min(5,h.tier||0)));
+    let hard=0;ch.forEach((h,j)=>{if((h.tier||0)>(ch[hard].tier||0))hard=j;});
+    const item={t:start,d:dur,k:ch.length===1&&(q.tier||0)<=1?'easy':'chain',q:cellLbl(q.row*N+q.col),
+      chain:techs,hard:techs[hard],len:ch.length,why:hintShort(ch[hard])};
+    if(item.k==='easy')rv.missedEasy++;
+    rv.byTech[item.hard]=(rv.byTech[item.hard]||0)+dur;
+    rv.stallTime+=dur;rv.stalls.push(item);
+  };
   for(let k=0;k<al.length;k++){
     const [tm,i,s,src]=al[k];
     const gap=tm-prevT;
-    // ── long pause before this action: what was available on the board right then?
-    if(gap>=stallMin&&(k===0||al[k-1][0]!==tm)){
-      const wrong=[...openWrong.entries()][0];
-      if(wrong){
-        rv.items.push({t:prevT,d:gap,k:'rvStallWrong',v:{d:fmtTime(gap),c:cellLbl(wrong[0]),at:fmtTime(wrong[1].t),what:t(wrong[1].kind==='q'?'rvWrongQWord':'rvWrongXWord')}});
-      }else{
-        let h=null;try{h=getNextHintForState(N,regions,Int8Array.from(S));}catch(_){}
-        if(h&&(h.tier||0)<7){
-          const tech=techOfStep(h),tier=h.tier||0;
-          const where=h.type==='queen'?cellLbl(h.row*N+h.col):(h.cells||[]).slice(0,3).map(([r,c])=>cellLbl(r*N+c)).join(', ');
-          if(tier<=1){rv.me++;rv.items.push({t:prevT,d:gap,k:'rvStallEasy',v:{d:fmtTime(gap),name:t('techN_'+(tech||'t'+tier)),c:where},tech});}
-          else{rv.hs++;rv.items.push({t:prevT,d:gap,k:'rvStallHard',v:{d:fmtTime(gap),name:t('techN_'+(tech||'t3')),c:where},tech:tech||'t3'});}
-        }
-      }
+    if(gap>=stallMin&&(k===0||al[k-1][0]!==tm))pushStall(prevT,gap,Int8Array.from(S));
+    // a wrong mark opens a mistake episode that starts at the PREVIOUS action
+    const wrongBefore=wrongCount();
+    const isWrongMark=(s===2&&!isSol(i))||(s===1&&isSol(i));
+    if(isWrongMark&&src==='u'){
+      rv.mistakes.push({t:tm,i,c:cellLbl(i),q:s===2});
+      if(!ep&&wrongBefore===0)ep={start:prevT,q0:goodQueens(),marks:[]};
+      if(ep)ep.marks.push({t:tm,i});
     }
-    prevT=tm;
-    if(src==='u'){
-      // churn = undecided toggling; creating or fixing a wrong mark is scored separately
-      const isMistakeEdit=(s===1&&isSolCell(i))||(s===2&&!isSolCell(i))||openWrong.has(i);
-      if(!isMistakeEdit)touches.set(i,(touches.get(i)||0)+1);
-      if(s===2){
-        if(!isSolCell(i)){rv.wq++;openWrong.set(i,{t:tm,kind:'q'});rv.items.push({t:tm,k:'rvWrongQ',v:{c:cellLbl(i)}});}
-        else if(!forcedNow(S,i))rv.lp++;
-      }else if(s===1){
-        if(isSolCell(i)){rv.wx++;openWrong.set(i,{t:tm,kind:'x'});rv.items.push({t:tm,k:'rvWrongX',v:{c:cellLbl(i)}});}
-        else if(blockedByQueen(S,i))rv.rx++;
-      }else if(s===0){
-        const w=openWrong.get(i);
-        if(w){rv.carry+=tm-w.t;openWrong.delete(i);rv.items.push({t:tm,k:'rvFixed',v:{c:cellLbl(i),d:fmtTime(tm-w.t)}});}
-      }
-      if(s!==0&&openWrong.has(i)&&!(s===2&&!isSolCell(i))&&!(s===1&&isSolCell(i))){const w=openWrong.get(i);rv.carry+=tm-w.t;openWrong.delete(i);}
-    }else if(src==='z')rv.undo++;
-    else if(src==='r')openWrong.clear();
     S[i]=s;
+    prevT=tm;
+    // the episode closes when the board is correct again with at least the
+    // same number of (correct) queens as just before the mistake — a reset counts
+    if(ep&&wrongCount()===0&&goodQueens()>=ep.q0){
+      const w=tm-ep.start;rv.waste+=w;
+      rv.episodes.push({start:ep.start,end:tm,w,marks:ep.marks.map(m=>({t:m.t,c:cellLbl(m.i)}))});
+      ep=null;
+    }
   }
-  rv.ch=[...touches.values()].filter(v=>v>=3).length;
-  rv.sc=Math.max(0,Math.round(100-8*rv.wq-6*rv.wx-4*rv.me-2*rv.ch-Math.min(10,Math.floor(rv.rx/3))));
-  rv.grade=rv.sc>=90?'A':rv.sc>=75?'B':rv.sc>=60?'C':'D';
-  // top suggestions, most costly first
-  const easy=rv.items.find(x=>x.k==='rvStallEasy');
-  const wx=rv.items.find(x=>x.k==='rvWrongX');
-  const hard=rv.items.filter(x=>x.k==='rvStallHard').sort((a,b)=>b.d-a.d)[0];
-  if(rv.wx)rv.tips.push({k:'rvTipWrongX',v:{c:wx.v.c,n:rv.wx,d:fmtTime(rv.carry)}});
-  if(rv.wq)rv.tips.push({k:'rvTipWrongQ',v:{n:rv.wq}});
-  if(easy)rv.tips.push({k:'rvTipEasy',v:{n:rv.me,c:easy.v.c,name:easy.v.name},tech:easy.tech});
-  if(hard)rv.tips.push({k:'rvTipHard',v:{d:hard.v.d,name:hard.v.name},tech:hard.tech});
-  if(rv.rx>=5)rv.tips.push({k:'rvTipRedundant',v:{n:rv.rx}});
-  if(rv.ch)rv.tips.push({k:'rvTipChurn',v:{n:rv.ch}});
-  if(!rv.wq&&!rv.wx&&!rv.me&&rv.lp>=Math.ceil(N/2))rv.tips.push({k:'rvTipLeaps',v:{n:rv.lp}});
-  if(!rv.tips.length)rv.tips.push({k:'rvTipClean'});
-  rv.tips=rv.tips.slice(0,4);
-  rv.items.sort((a,b)=>a.t-b.t);
-  rv.n=N;rv.time=timerSeconds;rv.when=Date.now();
+  if(ep){const w=timerSeconds-ep.start;rv.waste+=w;rv.episodes.push({start:ep.start,end:timerSeconds,w,marks:ep.marks.map(m=>({t:m.t,c:cellLbl(m.i)}))});}
+  // advice: where did the stuck time go, and how to move faster there
+  const tips=[];
+  const techTime=Object.entries(rv.byTech).sort((a,b)=>b[1]-a[1]);
+  if(techTime.length){const [tech,secs]=techTime[0];tips.push({k:'rvTipTech',v:{name:t('techN_'+tech),d:fmtTime(secs)},tip:TECH_TIP[tech],tech});}
+  if(rv.missedEasy)tips.push({k:'rvTipEasy',v:{n:rv.missedEasy},tip:'tipScan'});
+  const longest=rv.stalls.filter(x=>x.k==='chain').sort((a,b)=>b.len-a.len)[0];
+  if(longest&&longest.len>=3)tips.push({k:'rvTipChain',v:{n:longest.len,q:longest.q},tip:'tipChain'});
+  if(rv.waste)tips.push({k:'rvTipWaste',v:{n:rv.episodes.length,d:fmtTime(rv.waste)}});
+  if(!tips.length)tips.push({k:'rvTipClean'});
+  rv.tips=tips;
   return rv;
 }
+function reviewChainText(x){return x.chain.map(id=>t('techN_'+id)).join(' → ');}
 function renderReviewModal(){
   const rv=SAVE.lastReview;
   $('review-title').textContent=t('rvTitle');
-  if(!rv){$('review-body').innerHTML=`<p class="pane-intro">${t('rvNone')}</p>`;return;}
+  if(!rv||!rv.stalls){$('review-body').innerHTML=`<p class="pane-intro">${t('rvNone')}</p>`;return;}
   const tile=(v,k)=>`<div class="ach-stat"><b>${v}</b><span>${t(k)}</span></div>`;
-  let h=`<div class="ach-stats">`+tile(`${rv.grade} · ${rv.sc}`,'rvScore')+tile(fmtTime(rv.time),'statTime')+
-    tile(rv.wq+rv.wx,'rvMistakes')+tile(rv.me,'rvMissed')+tile(rv.rx,'rvRedundant')+tile(rv.ch,'rvChurn')+`</div>`;
+  let h=`<div class="ach-stats">`+tile(fmtTime(rv.time),'statTime')+tile(`${fmtTime(rv.stallTime)}`,'rvStuck')+
+    tile(rv.stalls.length,'rvStalls')+tile(rv.missedEasy,'rvMissed')+tile(rv.mistakes.length,'rvMistakes')+tile(fmtTime(rv.waste),'rvWaste')+`</div>`;
   h+=`<h4 class="st-h">${t('rvTipsTitle')}</h4><ul class="st-advice">`+rv.tips.map(x=>
-    `<li>${tf(x.k,x.v)}${x.tech?` <button class="btn-hint-inline st-train" data-train="${x.tech}">${t('stTrainBtn')}</button>`:''}</li>`).join('')+`</ul>`;
-  h+=`<h4 class="st-h">${t('rvTimeline')}</h4>`+(rv.items.length?`<ul class="rv-tl">`+rv.items.map(x=>
-    `<li><span class="rv-t">${fmtTime(x.t)}</span><span>${tf(x.k,x.v)}</span></li>`).join('')+`</ul>`:`<p class="pane-intro">${t('rvNoEvents')}</p>`);
+    `<li>${tf(x.k,x.v)}${x.tip?`<br><span class="rv-how">${t(x.tip)}</span>`:''}${x.tech?` <button class="btn-hint-inline st-train" data-train="${x.tech}">${t('stTrainBtn')}</button>`:''}</li>`).join('')+`</ul>`;
+  const ev=[];
+  rv.stalls.forEach(x=>ev.push({t:x.t,html:x.k==='mistake'
+    ?tf('rvStallMistake',{d:fmtTime(x.d),c:x.c,at:fmtTime(x.at)})
+    :x.k==='easy'?tf('rvStallEasy',{d:fmtTime(x.d),q:x.q,why:x.why})
+    :tf('rvStallChain',{d:fmtTime(x.d),q:x.q,n:x.len,chain:reviewChainText(x),hard:t('techN_'+x.hard)})}));
+  rv.episodes.forEach(e=>ev.push({t:e.marks[0].t,html:tf('rvEpisode',{c:e.marks.map(m=>m.c).join(', '),at:fmtTime(e.marks[0].t),from:fmtTime(e.start),to:fmtTime(e.end),w:fmtTime(e.w)})}));
+  ev.sort((a,b)=>a.t-b.t);
+  h+=`<h4 class="st-h">${t('rvTimeline')}</h4>`+(ev.length?`<ul class="rv-tl">`+ev.map(x=>
+    `<li><span class="rv-t">${fmtTime(x.t)}</span><span>${x.html}</span></li>`).join('')+`</ul>`:`<p class="pane-intro">${t('rvNoEvents')}</p>`);
   h+=`<p class="st-note">${t('rvNote')}</p>`;
   $('review-body').innerHTML=h;
 }
@@ -6021,6 +6125,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('review-modal').s
   let started=false;
   try{ started=restoreResume(); }catch(e){ console.warn('resume failed',e);started=false; }
   if(started&&dailyMode)SAVE.prefs.modeTab='daily';
+  if(started&&qoMode)SAVE.prefs.modeTab='train';
   if(!started){
     try{
       const lc=SAVE.prefs.lastCh;

@@ -1,6 +1,8 @@
 # Queens Puzzle — Simulator & Trainer
 
-A single-file, zero-dependency HTML implementation of the LinkedIn **Queens** puzzle, with a human-style multi-tier solving engine, difficulty-graded generators, bilingual UI (EN / 中文) and six themes.
+A single-file, zero-dependency HTML **Queens** logic puzzle, with a human-style multi-tier solving engine, difficulty-graded generators, a 300-level Challenge mode, technique Training, a Daily puzzle in three difficulties, personal stats with solving advice, bilingual UI (EN / 中文) and six themes.
+
+> Inspired by LinkedIn's daily puzzle games — the rules are the same as LinkedIn's *Queens*. This is an independent project, not affiliated with LinkedIn.
 
 **[▶ Play it](index.html)** — just open `index.html` in any browser. No build, no server, no install.
 
@@ -25,23 +27,73 @@ The engine scans tiers in strict order 0 → 7 and returns the first technique t
 | 6 | ✕ Region Confinement | One region's open cells all lie in a single row or column. |
 | 7 | ⚠ Lookahead | Trial placement forces a contradiction. **The only tier that guesses.** |
 
-Tiers 0–6 are pure forward deduction. A board that cannot be finished without Tier 7 is flagged with a **dot** on its difficulty badge (e.g. `intensive.`) so you always know whether a puzzle is fair.
+Tiers 0–6 are pure forward deduction. **No board the game serves ever needs Tier 7** — generators reject or reshape such boards, and user-built or imported boards that need it are refused. (Tier 6 is kept for completeness; in practice its cases are already caught by Tier 2.)
 
 ### Difficulty levels
 
-| Level | Definition |
+One function (`classifyDifficulty`) defines the classes from the solver's own solution path; every generator, the Challenge levels, the Daily boards and the in-game Difficulty Guide use it. Each board lands in exactly one class.
+
+| Level | Definition (n = board size) |
 |---|---|
-| **Easy** | Almost entirely "only cell left" spotting. |
-| **Medium** | Adds basic elimination before the forced cells appear. |
-| **Hard** | Requires multi-region reasoning (N regions ↔ N lines). |
-| **Intensive** | Dense deduction chains including killer logic. |
-| **Advanced ★** | Deliberately slow to open; *may* require lookahead. |
-| **Master ★★** | **Guaranteed 100% pure logic** — never needs trial and error — yet forces the deepest techniques (Group Lock / Region Confinement). The fairest hardest level. |
-| **Custom** | You choose board size and single-cell region budget. |
+| **Easy** | Tiers 0–2 only, and every Tier-2 step involves a single region (a region lying in one line clears the rest of it). |
+| **Medium** | Tiers 0–2 with at least one **multi-region** exclusion (2+ regions ↔ the same 2+ lines). No Killer. |
+| **Hard** | Needs Tier 3 Killer, but fewer than ⌈n/3⌉ deep (Tier 3+) steps. |
+| **Intensive** | Killer is the backbone: ≥ ⌈n/3⌉ Tier-3 steps, nothing above Tier 3. |
+| **Advanced ★** | Needs Tier 4+ (Zone/Overflow or Group Lock) at least once, below the Master bar. |
+| **Master ★★** | Tier 5 Group Lock, ≥ 0.35n deep steps, ≥ 0.7n Tier-2+ steps, first queen after ≥ 0.3n steps. |
+| **Custom** | You choose board size, region shapes and single-cell region budget (still pure logic). |
+
+Before this version, the Easy/Medium/Hard generators were statistically indistinguishable (measured on 540 boards: in the old "Hard" output, 85 of 180 boards were Easy by the definition above). Generation now **hill-climbs region borders into the requested class** (`fitToClass`: simplify when too hard, complexify when too easy, keeping the solution unique and regions connected).
 
 Generation is **difficulty-first**: candidate boards are mutated and re-scored against the human solver until they clear the bar. The generator never silently downgrades — if you ask for Master, you wait until you get a real Master.
 
 ---
+
+## Challenge mode
+
+Six tracks (Easy → Master ★★), **50 levels each**, 10 chapters of 5. Board sizes vary between 5×5 and 10×10 while difficulty within a track stays level; **every 5th level is a 👑 boss** drawn from the hardest band of its track (and at least 7×7 / 8×8).
+
+- Levels are pre-generated offline and graded by the in-page solver (`tools/`), so they load instantly and are identical for every player. All 300 are verified unique, connected, pure-logic and of exactly their track's class. Track ratings rise monotonically (avg solver rating 41 → 54 → 67 → 76 → 101 → 126).
+- **Stars per level**: 3★ = no hints and within par time · hints or over par cost a star · viewing the solution caps the level at 1★ (asks for confirmation first).
+- **Motivation layer**: level map with stars and best times, chess-piece ranks from total stars (Pawn → Grandmaster), 16 trophies, daily solving streak, free-play personal bests per size/difficulty, confetti / boss celebration, toast notifications.
+
+## Technique Training
+
+Seven techniques (Tier 0 → Tier 5, Tier 2 split into single- and multi-region), **12 drills each** on 5×5–10×10 boards. A drill pauses a real board right before one deduction — no easier move exists at that moment — and asks you to place the forced queen or mark every cell the technique rules out. *Check* gives graded feedback (missing cells, extra cells, a valid deduction of another technique, a ✕ on a solution queen); a correct answer shows the solver's explanation with the board highlight. Each technique has a "How it works" card. Results (first try / solved / revealed, time) feed the stats.
+
+## Daily puzzle
+
+One date-seeded board family per day, identical for everyone: **Normal** (Hard class) is generated from the date seed; **Easy** and **Hard** (Intensive class) are the *same layout* hill-climbed down/up into their class, so the three share a family resemblance. Built in the browser in about a second and cached for the day. 14-day calendar and daily streak.
+
+## Personal stats & solving evaluation
+
+Every solve is logged (size, class, time, moves, hints and the tier of each hint, wrong queens placed, solution viewed). **Speed index** = 100 × expected ÷ actual time, where expected time comes from the board's own solution path (scan cost by size + a cost per deduction tier). The stats dialog shows tiles, a 30-solve speed trend, a per-difficulty table, a technique profile (Training accuracy, time to find, hint dependence) and rule-based **advice** — the technique that blocks you (with a one-click drill), wrong-queen habits, big-board slowdown, trend, readiness for the next difficulty. *The cost model is a heuristic, not yet fitted to player data.*
+
+## Solve review — where you got stuck
+
+Every board change is logged as *(time, cell, new state, source)* and replayed after a win. Your order of play is never compared with the solver's; there is **no score**. The review answers two questions:
+
+- **Why were you stuck?** A stall is a pause ≥ 2.5× your own median gap between actions (min 10 s). For each stall the engine computes, *from the board you had at that moment*, the chain of deductions needed to reach the next queen — so eliminations you kept in your head are never held against you. The stall is labelled "immediate queen was waiting" (with the cell and reason), "chain of N deductions: A → B → C, hardest link X", or "blocked by a wrong mark". Tips say how to move faster at that kind of spot, with a one-click drill.
+- **What did mistakes cost?** Each wrong mark is time-stamped. Lost time = from the action *before* the wrong mark until the board is correct again with at least as many correct queens as before — resets included.
+
+Recent reviews feed *My Stats* (time-stuck share, the technique you stall on most, time lost to mistakes). Auto Elimination is never recommended: it lowers the difficulty.
+
+## Queens-only training (no ✕)
+
+Strong players keep eliminations in their head, as in Minesweeper: think, then click only the safe cell. In this mode ✕ marking (and Auto Elimination) is disabled — a click places or removes a queen. 20 levels are ordered by **chain length**, the number of deductions you must hold before the next queen is certain: from 1 step (6×6) to a 10×10 that needs 21 deductions before its first queen.
+
+## Web Worker generation
+
+Generation runs on a background thread of the player's own device (a Web Worker built at runtime from the page's pure engine block, `/*ENGINE_BEGIN*/ … /*ENGINE_END*/`). No server is involved. The page stays responsive during long generations (measured: Master 10×10, 26.5 s, ~58 fps on the main thread). Daily boards are built in the worker too and are byte-identical to the main-thread result. If workers are unavailable the old main-thread loop is used.
+
+## Queen icons
+
+A dropdown next to the theme picker: **♛ Queen** (default), **✨ Theme** (follows the theme), any single icon, or **🎲 Random** (shown as `Random (current icon)`). One icon per theme, drawn as SVG masks in the theme's own queen colour: Daylight ☀️ sun (solid disc, short rays) · Seafoam 🐚 flat scallop shell with a wavy rim · Blossom 🌸 seven-petal sakura · Midnight ⭐ solid star with sparkles · Abyss 🔮 crystal cluster fanning out · Aubergine 💎 faceted gem.
+
+## Saved locally
+
+Uses `localStorage` when the browser allows it (everything still works without it):
+challenge progress, stars, best times, trophies, solve log, Training results, Daily boards and calendar, streaks · language · queen icon · theme (a specific theme, or **Random** — shown as `Random (current theme)`) · last free-play size/difficulty · the board in progress (marks, moves, timer), so a reload continues where you left off. A *Reset progress* button lives in the Trophies dialog.
 
 ## Features
 
@@ -51,7 +103,8 @@ Generation is **difficulty-first**: candidate boards are mutated and re-scored a
 - **Six themes** (three light, three dark) with auto day/night selection; all colour pairs verified for perceptual distance
 - **Seeds** — every board exports to a shareable base64 string and loads back exactly
 - **Drag to mark**, undo, auto-elimination, edit mode, win detection, timer that pauses when the tab hides (generation keeps running)
-- Board sizes 7×7 through 12×12
+- Board sizes 5×5 through 12×12
+- Responsive layout: three columns on wide screens (controls · board · info), board scales to the viewport height; board-first ordering on phones
 
 ## Repository layout
 
@@ -59,6 +112,18 @@ Generation is **difficulty-first**: candidate boards are mutated and re-scored a
 index.html          Current version — the whole game, one file
 releases/           Timestamped historical builds
 ARCHITECTURE.md     Engine internals, design decisions, benchmark seeds
+tools/              Challenge level pipeline + headless UI test
+```
+
+### Rebuilding Challenge levels
+
+```bash
+npm install jsdom --no-save
+node tools/gen-challenge-pool.js master 5,6,7,8,9,10 120 pool/master.jsonl 2400   # repeat per difficulty
+node tools/build-challenge-levels.js pool/      # classifies + selects 6×50 levels, patches index.html
+node tools/build-training-drills.js pool/       # 7×12 technique drills, patches index.html
+node tools/build-queens-only.js pool/          # 20 queens-only levels by chain length
+node tools/test-ui.js                           # integrity + UI flow regression
 ```
 
 ## Development notes
